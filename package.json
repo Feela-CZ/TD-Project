@@ -1,0 +1,48 @@
+{
+  "name": "tower-defense-headless-mvp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "verify": "npm run build && node dist/verify.mjs",
+    "verify:alpha": "npm run build && node dist/live.verify.mjs",
+    "verify:ultimates": "npm run build && node scripts/ultimate-smoke.mjs",
+    "simulate": "npm run build && node dist/run.mjs",
+    "play": "npm run build && node scripts/serve.mjs",
+    "balance:matrix": "npm run build && node scripts/balance-matrix.mjs",
+    "balance:alpha": "npm run build && node scripts/alpha-balance.mjs",
+    "balance:progression": "npm run build && node scripts/alpha-balance.mjs --solo",
+    "package:windows": "npm run build && electron-builder --win portable --publish never",
+    "package:web": "npm run build && node scripts/package-web.mjs"
+  },
+  "main": "desktop/main.mjs",
+  "build": {
+    "appId": "com.towerdefense.alpha",
+    "productName": "Tower Defense Alpha",
+    "files": [
+      "desktop/**/*",
+      "web/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "Tower-Defense-Alpha-${version}-Windows.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

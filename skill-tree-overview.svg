@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="4500" viewBox="0 0 1920 4500" role="img" aria-labelledby="title desc">
+  <title id="title">Tower Defense complete skill tree</title>
+  <desc id="desc">Three upward trees. Every tree starts from its base, branches to three Tier I families, then nine Tier II skills, and finally their Tier III Ultimates.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#8894a7"/></marker>
+    <style>
+      .bg { fill:#10151f; } .panel { fill:#151d2a; stroke:#344158; stroke-width:2; }
+      .wire { fill:none; stroke:#73819a; stroke-width:2.5; marker-end:url(#arrow); }
+      .tier { font:600 22px Arial,sans-serif; fill:#aeb9cb; letter-spacing:2px; text-anchor:middle; }
+      .title { font:700 38px Arial,sans-serif; fill:#f2f6ff; text-anchor:middle; }
+      .sub { font:400 19px Arial,sans-serif; fill:#b8c4d8; text-anchor:middle; }
+      .node { stroke-width:2; } .base { fill:#273a59; stroke:#7197d0; } .root { fill:#203c3b; stroke:#55a399; }
+      .skill { fill:#202938; stroke:#53647c; } .ultimate { fill:#382a50; stroke:#a37ed3; } .open { fill:#2c2d36; stroke:#707586; stroke-dasharray:7 5; }
+      .name { font:700 20px Arial,sans-serif; fill:#f2f6ff; text-anchor:middle; }
+      .effect { font:400 16px Arial,sans-serif; fill:#c5cfdf; text-anchor:middle; }
+      .tag { font:600 14px Arial,sans-serif; fill:#9facbf; text-anchor:middle; letter-spacing:1px; }
+      .legend { font:400 16px Arial,sans-serif; fill:#b8c4d8; }
+    </style>
+  </defs>
+  <rect class="bg" width="1920" height="4500"/>
+
+  <!-- OFFENSE -->
+  <g transform="translate(0,0)">
+    <rect class="panel" x="35" y="30" width="1850" height="1440" rx="20"/>
+    <text class="title" x="960" y="90">OFFENSE</text><text class="sub" x="960" y="122">Tower damage, firing cadence and critical conversion</text>
+    <text class="tier" x="960" y="170">TIER III — ONE ULTIMATE PER TIER-I FAMILY</text>
+    <text class="tier" x="960" y="475">TIER II — CHOOSE TWO OF THREE</text>
+    <text class="tier" x="960" y="1010">TIER I</text>
+    <path class="wire" d="M260 960 L260 890"/><path class="wire" d="M960 960 L960 890"/><path class="wire" d="M1660 960 L1660 890"/>
+    <path class="wire" d="M260 700 L100 650"/><path class="wire" d="M260 700 L260 650"/><path class="wire" d="M260 700 L420 650"/>
+    <path class="wire" d="M960 700 L800 650"/><path class="wire" d="M960 700 L960 650"/><path class="wire" d="M960 700 L1120 650"/>
+    <path class="wire" d="M1660 700 L1500 650"/><path class="wire" d="M1660 700 L1660 650"/><path class="wire" d="M1660 700 L1820 650"/>
+    <path class="wire" d="M100 500 L100 350"/><path class="wire" d="M260 500 L260 350"/><path class="wire" d="M420 500 L420 350"/><path class="wire" d="M800 500 L800 350"/><path class="wire" d="M960 500 L960 350"/><path class="wire" d="M1120 500 L1120 350"/><path class="wire" d="M1500 500 L1500 350"/><path class="wire" d="M1660 500 L1660 350"/><path class="wire" d="M1820 500 L1820 350"/>
+    <rect class="node root" x="150" y="700" width="220" height="190" rx="14"/><text class="name" x="260" y="755">Ordnance</text><text class="effect" x="260" y="790"><tspan x="260">raises direct</tspan><tspan x="260" dy="22">Round damage</tspan></text>
+    <rect class="node root" x="850" y="700" width="220" height="190" rx="14"/><text class="name" x="960" y="755">Cadence</text><text class="effect" x="960" y="790"><tspan x="960">raises fire rate</tspan><tspan x="960" dy="22">and hit frequency</tspan></text>
+    <rect class="node root" x="1550" y="700" width="220" height="190" rx="14"/><text class="name" x="1660" y="755">Precision</text><text class="effect" x="1660" y="790"><tspan x="1660">raises critical-hit</tspan><tspan x="1660" dy="22">chance and value</tspan></text>
+    <g><!-- Tier II offense -->
+      <rect class="node skill" x="20" y="500" width="160" height="150" rx="12"/><text class="name" x="100" y="535">Bio-Tar</text><text class="name" x="100" y="560">Rounds</text><text class="effect" x="100" y="592"><tspan x="100">slow; extends</tspan><tspan x="100" dy="19">Thermite</tspan></text>
+      <rect class="node skill" x="180" y="500" width="160" height="150" rx="12"/><text class="name" x="260" y="545">Reaper’s Gaze</text><text class="effect" x="260" y="580"><tspan x="260">damage rises with</tspan><tspan x="260" dy="19">missing HP</tspan></text>
+      <rect class="node skill" x="340" y="500" width="160" height="150" rx="12"/><text class="name" x="420" y="535">Shrapnel</text><text class="name" x="420" y="560">Requiem</text><text class="effect" x="420" y="592"><tspan x="420">overkill transfers</tspan><tspan x="420" dy="19">on kill</tspan></text>
+      <rect class="node skill" x="720" y="500" width="160" height="150" rx="12"/><text class="name" x="800" y="545">Split Volley</text><text class="effect" x="800" y="580"><tspan x="800">chance for extra</tspan><tspan x="800" dy="19">Rounds</tspan></text>
+      <rect class="node skill" x="880" y="500" width="160" height="150" rx="12"/><text class="name" x="960" y="535">Thermite</text><text class="name" x="960" y="560">Trace</text><text class="effect" x="960" y="592"><tspan x="960">three delayed</tspan><tspan x="960" dy="19">damage ticks</tspan></text>
+      <rect class="node skill" x="1040" y="500" width="160" height="150" rx="12"/><text class="name" x="1120" y="545">Combat Rhythm</text><text class="effect" x="1120" y="580"><tspan x="1120">successive shots</tspan><tspan x="1120" dy="19">raise attack speed</tspan></text>
+      <rect class="node skill" x="1420" y="500" width="160" height="150" rx="12"/><text class="name" x="1500" y="535">Deadeye</text><text class="name" x="1500" y="560">Protocol</text><text class="effect" x="1500" y="592"><tspan x="1500">adds critical</tspan><tspan x="1500" dy="19">chance</tspan></text>
+      <rect class="node skill" x="1580" y="500" width="160" height="150" rx="12"/><text class="name" x="1660" y="535">Terminal</text><text class="name" x="1660" y="560">Vector</text><text class="effect" x="1660" y="592"><tspan x="1660">raises critical</tspan><tspan x="1660" dy="19">multiplier</tspan></text>
+      <rect class="node skill" x="1740" y="500" width="160" height="150" rx="12"/><text class="name" x="1820" y="535">Static</text><text class="name" x="1820" y="560">Discharge</text><text class="effect" x="1820" y="592"><tspan x="1820">crit jumps and</tspan><tspan x="1820" dy="19">reapplies effects</tspan></text>
+    </g>
+    <g><!-- Ultimates offense -->
+      <rect class="node open" x="20" y="190" width="160" height="160" rx="12"/><text class="tag" x="100" y="225">ULTIMATE</text><text class="name" x="100" y="260">OPEN</text><text class="effect" x="100" y="292"><tspan x="100">Bio-Tar</tspan><tspan x="100" dy="19">candidate</tspan></text>
+      <rect class="node open" x="180" y="190" width="160" height="160" rx="12"/><text class="tag" x="260" y="225">ULTIMATE</text><text class="name" x="260" y="260">OPEN</text><text class="effect" x="260" y="292"><tspan x="260">Reaper</tspan><tspan x="260" dy="19">candidate</tspan></text>
+      <rect class="node open" x="340" y="190" width="160" height="160" rx="12"/><text class="tag" x="420" y="225">ULTIMATE</text><text class="name" x="420" y="260">OPEN</text><text class="effect" x="420" y="292"><tspan x="420">Requiem</tspan><tspan x="420" dy="19">candidate</tspan></text>
+      <rect class="node ultimate" x="720" y="190" width="160" height="160" rx="12"/><text class="tag" x="800" y="225">ULTIMATE</text><text class="name" x="800" y="260">Vector Reversal</text><text class="effect" x="800" y="292"><tspan x="800">extra Round</tspan><tspan x="800" dy="19">pushes target back</tspan></text>
+      <rect class="node ultimate" x="880" y="190" width="160" height="160" rx="12"/><text class="tag" x="960" y="225">ULTIMATE</text><text class="name" x="960" y="260">Thermal Rupture</text><text class="effect" x="960" y="292"><tspan x="960">Thermite kill:</tspan><tspan x="960" dy="19">area + residue</tspan></text>
+      <rect class="node ultimate" x="1040" y="190" width="160" height="160" rx="12"/><text class="tag" x="1120" y="225">ULTIMATE</text><text class="name" x="1120" y="260">Overclock</text><text class="name" x="1120" y="284">Protocol</text><text class="effect" x="1120" y="314">3× rate, 30% damage</text>
+      <rect class="node ultimate" x="1420" y="190" width="160" height="160" rx="12"/><text class="tag" x="1500" y="225">ULTIMATE</text><text class="name" x="1500" y="260">Focus Cascade</text><text class="effect" x="1500" y="292"><tspan x="1500">10 crits trigger</tspan><tspan x="1500" dy="19">payoff — open</tspan></text>
+      <rect class="node ultimate" x="1580" y="190" width="160" height="160" rx="12"/><text class="tag" x="1660" y="225">ULTIMATE</text><text class="name" x="1660" y="260">Entropy Vector</text><text class="effect" x="1660" y="292"><tspan x="1660">weighted 3×–10×</tspan><tspan x="1660" dy="19">critical value</tspan></text>
+      <rect class="node ultimate" x="1740" y="190" width="160" height="160" rx="12"/><text class="tag" x="1820" y="225">ULTIMATE</text><text class="name" x="1820" y="260">Arc Stagger</text><text class="effect" x="1820" y="292"><tspan x="1820">brief stop then</tspan><tspan x="1820" dy="19">speed recovery</tspan></text>
+    </g>
+    <rect class="node base" x="690" y="1120" width="540" height="160" rx="18"/><text class="name" x="960" y="1175">OFFENSE BASE</text><text class="effect" x="960" y="1210"><tspan x="960">Autonomous tower Rounds: random damage, projectile flight and base critical hits.</tspan><tspan x="960" dy="23">Tier I investments unlock the three offensive directions above.</tspan></text>
+  </g>
+
+  <!-- MUTATION -->
+  <g transform="translate(0,1500)">
+    <rect class="panel" x="35" y="30" width="1850" height="1440" rx="20"/>
+    <text class="title" x="960" y="90">MUTATION</text><text class="sub" x="960" y="122">Kethra resilience, movement and collective biomass</text>
+    <text class="tier" x="960" y="170">TIER III — ONE ULTIMATE PER TIER-I FAMILY</text><text class="tier" x="960" y="475">TIER II — CHOOSE TWO OF THREE</text><text class="tier" x="960" y="1010">TIER I</text>
+    <path class="wire" d="M260 960 L260 890"/><path class="wire" d="M960 960 L960 890"/><path class="wire" d="M1660 960 L1660 890"/>
+    <path class="wire" d="M260 700 L100 650"/><path class="wire" d="M260 700 L260 650"/><path class="wire" d="M260 700 L420 650"/><path class="wire" d="M960 700 L800 650"/><path class="wire" d="M960 700 L960 650"/><path class="wire" d="M960 700 L1120 650"/><path class="wire" d="M1660 700 L1500 650"/><path class="wire" d="M1660 700 L1660 650"/><path class="wire" d="M1660 700 L1820 650"/>
+    <path class="wire" d="M100 500 L100 350"/><path class="wire" d="M260 500 L260 350"/><path class="wire" d="M420 500 L420 350"/><path class="wire" d="M800 500 L800 350"/><path class="wire" d="M960 500 L960 350"/><path class="wire" d="M1120 500 L1120 350"/><path class="wire" d="M1500 500 L1500 350"/><path class="wire" d="M1660 500 L1660 350"/><path class="wire" d="M1820 500 L1820 350"/>
+    <rect class="node root" x="150" y="700" width="220" height="190" rx="14"/><text class="name" x="260" y="755">Carapace</text><text class="effect" x="260" y="790"><tspan x="260">+5% base armor</tspan><tspan x="260" dy="22">per Tier-I level</tspan></text>
+    <rect class="node root" x="850" y="700" width="220" height="190" rx="14"/><text class="name" x="960" y="755">Kinesis</text><text class="effect" x="960" y="790"><tspan x="960">+10% movement</tspan><tspan x="960" dy="22">speed per level</tspan></text>
+    <rect class="node root" x="1550" y="700" width="220" height="190" rx="14"/><text class="name" x="1660" y="755">Vital Mass</text><text class="effect" x="1660" y="790"><tspan x="1660">+10% maximum HP</tspan><tspan x="1660" dy="22">per level</tspan></text>
+    <g><!-- Tier II mutations -->
+      <rect class="node skill" x="20" y="500" width="160" height="150" rx="12"/><text class="name" x="100" y="535">Distributed</text><text class="name" x="100" y="560">Shell</text><text class="effect" x="100" y="592"><tspan x="100">shares final</tspan><tspan x="100" dy="19">damage in Killzone</tspan></text>
+      <rect class="node skill" x="180" y="500" width="160" height="150" rx="12"/><text class="name" x="260" y="535">Failsafe</text><text class="name" x="260" y="560">Cocoon</text><text class="effect" x="260" y="592"><tspan x="260">lethal Round may</tspan><tspan x="260" dy="19">leave 1 HP</tspan></text>
+      <rect class="node skill" x="340" y="500" width="160" height="150" rx="12"/><text class="name" x="420" y="535">Swarm</text><text class="name" x="420" y="560">Synthesis</text><text class="effect" x="420" y="592"><tspan x="420">four Kethra may</tspan><tspan x="420" dy="19">become Chimera</tspan></text>
+      <rect class="node skill" x="720" y="500" width="160" height="150" rx="12"/><text class="name" x="800" y="535">Momentum</text><text class="name" x="800" y="560">Plating</text><text class="effect" x="800" y="592"><tspan x="800">speed converts</tspan><tspan x="800" dy="19">to capped armor</tspan></text>
+      <rect class="node skill" x="880" y="500" width="160" height="150" rx="12"/><text class="name" x="960" y="535">Impact</text><text class="name" x="960" y="560">Dynamo</text><text class="effect" x="960" y="592"><tspan x="960">absorbed armor</tspan><tspan x="960" dy="19">damage gives speed</tspan></text>
+      <rect class="node skill" x="1040" y="500" width="160" height="150" rx="12"/><text class="name" x="1120" y="535">Phase</text><text class="name" x="1120" y="560">Curl</text><text class="effect" x="1120" y="592"><tspan x="1120">rare automatic</tspan><tspan x="1120" dy="19">forward skip</tspan></text>
+      <rect class="node skill" x="1420" y="500" width="160" height="150" rx="12"/><text class="name" x="1500" y="535">Regrowth</text><text class="name" x="1500" y="560">Node</text><text class="effect" x="1500" y="592"><tspan x="1500">checkpoint heals</tspan><tspan x="1500" dy="19">max-HP share</tspan></text>
+      <rect class="node skill" x="1580" y="500" width="160" height="150" rx="12"/><text class="name" x="1660" y="535">Biomass</text><text class="name" x="1660" y="560">Pool</text><text class="effect" x="1660" y="592"><tspan x="1660">dead Kethra heals</tspan><tspan x="1660" dy="19">group in Killzone</tspan></text>
+      <rect class="node skill" x="1740" y="500" width="160" height="150" rx="12"/><text class="name" x="1820" y="535">Hive</text><text class="name" x="1820" y="560">Equilibrium</text><text class="effect" x="1820" y="592"><tspan x="1820">periodic group</tspan><tspan x="1820" dy="19">regeneration</tspan></text>
+    </g>
+    <g><!-- Ultimates mutations -->
+      <rect class="node ultimate" x="20" y="190" width="160" height="160" rx="12"/><text class="tag" x="100" y="225">ULTIMATE</text><text class="name" x="100" y="260">Burden Matrix</text><text class="effect" x="100" y="292"><tspan x="100">low-HP node</tspan><tspan x="100" dy="19">is sheltered</tspan></text>
+      <rect class="node ultimate" x="180" y="190" width="160" height="160" rx="12"/><text class="tag" x="260" y="225">ULTIMATE</text><text class="name" x="260" y="260">Chrysalis</text><text class="name" x="260" y="284">Rebirth</text><text class="effect" x="260" y="314">invulnerable heal</text>
+      <rect class="node ultimate" x="340" y="190" width="160" height="160" rx="12"/><text class="tag" x="420" y="225">ULTIMATE</text><text class="name" x="420" y="260">Brood Fracture</text><text class="effect" x="420" y="292"><tspan x="420">dead Chimera</tspan><tspan x="420" dy="19">splits into four</tspan></text>
+      <rect class="node open" x="720" y="190" width="160" height="160" rx="12"/><text class="tag" x="800" y="225">ULTIMATE</text><text class="name" x="800" y="260">OPEN</text><text class="effect" x="800" y="292">Momentum candidate</text>
+      <rect class="node open" x="880" y="190" width="160" height="160" rx="12"/><text class="tag" x="960" y="225">ULTIMATE</text><text class="name" x="960" y="260">OPEN</text><text class="effect" x="960" y="292">Dynamo candidate</text>
+      <rect class="node open" x="1040" y="190" width="160" height="160" rx="12"/><text class="tag" x="1120" y="225">ULTIMATE</text><text class="name" x="1120" y="260">OPEN</text><text class="effect" x="1120" y="292">Phase candidate</text>
+      <rect class="node open" x="1420" y="190" width="160" height="160" rx="12"/><text class="tag" x="1500" y="225">ULTIMATE</text><text class="name" x="1500" y="260">OPEN</text><text class="effect" x="1500" y="292">Regrowth candidate</text>
+      <rect class="node open" x="1580" y="190" width="160" height="160" rx="12"/><text class="tag" x="1660" y="225">ULTIMATE</text><text class="name" x="1660" y="260">OPEN</text><text class="effect" x="1660" y="292">Biomass candidate</text>
+      <rect class="node open" x="1740" y="190" width="160" height="160" rx="12"/><text class="tag" x="1820" y="225">ULTIMATE</text><text class="name" x="1820" y="260">OPEN</text><text class="effect" x="1820" y="292">Equilibrium candidate</text>
+    </g>
+    <rect class="node base" x="690" y="1120" width="540" height="160" rx="18"/><text class="name" x="960" y="1175">MUTATION BASE</text><text class="effect" x="960" y="1210"><tspan x="960">The owner’s mutation upgrades define the opponent’s Kethra at spawn.</tspan><tspan x="960" dy="23">Armor, movement and HP can stack with their Tier-II effects.</tspan></text>
+  </g>
+
+  <!-- UTILITY -->
+  <g transform="translate(0,3000)">
+    <rect class="panel" x="35" y="30" width="1850" height="1440" rx="20"/>
+    <text class="title" x="960" y="90">UTILITY</text><text class="sub" x="960" y="122">Flux flow, battlefield information and active pressure tools</text>
+    <text class="tier" x="960" y="170">TIER III — ONE ULTIMATE PER TIER-I FAMILY</text><text class="tier" x="960" y="475">TIER II — CHOOSE TWO OF THREE</text><text class="tier" x="960" y="1010">TIER I</text>
+    <path class="wire" d="M260 960 L260 890"/><path class="wire" d="M960 960 L960 890"/><path class="wire" d="M1660 960 L1660 890"/>
+    <path class="wire" d="M260 700 L100 650"/><path class="wire" d="M260 700 L260 650"/><path class="wire" d="M260 700 L420 650"/><path class="wire" d="M960 700 L800 650"/><path class="wire" d="M960 700 L960 650"/><path class="wire" d="M960 700 L1120 650"/><path class="wire" d="M1660 700 L1500 650"/><path class="wire" d="M1660 700 L1660 650"/><path class="wire" d="M1660 700 L1820 650"/>
+    <path class="wire" d="M100 500 L100 350"/><path class="wire" d="M260 500 L260 350"/><path class="wire" d="M420 500 L420 350"/><path class="wire" d="M800 500 L800 350"/><path class="wire" d="M960 500 L960 350"/><path class="wire" d="M1120 500 L1120 350"/><path class="wire" d="M1500 500 L1500 350"/><path class="wire" d="M1660 500 L1660 350"/><path class="wire" d="M1820 500 L1820 350"/>
+    <rect class="node root" x="150" y="700" width="220" height="190" rx="14"/><text class="name" x="260" y="755">Reserves</text><text class="effect" x="260" y="790"><tspan x="260">improves Flux</tspan><tspan x="260" dy="22">Yield economy</tspan></text>
+    <rect class="node root" x="850" y="700" width="220" height="190" rx="14"/><text class="name" x="960" y="755">Control Nexus</text><text class="effect" x="960" y="790"><tspan x="960">reach, strain and</tspan><tspan x="960" dy="22">opponent knowledge</tspan></text>
+    <rect class="node root" x="1550" y="700" width="220" height="190" rx="14"/><text class="name" x="1660" y="755">Surge Core</text><text class="effect" x="1660" y="790"><tspan x="1660">base Overdrive +</tspan><tspan x="1660" dy="22">active abilities</tspan></text>
+    <g><!-- Tier II utility -->
+      <rect class="node skill" x="20" y="500" width="160" height="150" rx="12"/><text class="name" x="100" y="535">Echo</text><text class="name" x="100" y="560">Reserve</text><text class="effect" x="100" y="592"><tspan x="100">past purchases</tspan><tspan x="100" dy="19">echo as Yield</tspan></text>
+      <rect class="node skill" x="180" y="500" width="160" height="150" rx="12"/><text class="name" x="260" y="535">Flux</text><text class="name" x="260" y="560">Battery</text><text class="effect" x="260" y="592"><tspan x="260">held Flux fires</tspan><tspan x="260" dy="19">extra Rounds</tspan></text>
+      <rect class="node skill" x="340" y="500" width="160" height="150" rx="12"/><text class="name" x="420" y="535">Excess</text><text class="name" x="420" y="560">Reclamation</text><text class="effect" x="420" y="592"><tspan x="420">overkill returns</tspan><tspan x="420" dy="19">Flux</tspan></text>
+      <rect class="node skill" x="720" y="500" width="160" height="150" rx="12"/><text class="name" x="800" y="535">Pain</text><text class="name" x="800" y="560">Tolerance</text><text class="effect" x="800" y="592"><tspan x="800">raises Core</tspan><tspan x="800" dy="19">Strain ceiling</tspan></text>
+      <rect class="node skill" x="880" y="500" width="160" height="150" rx="12"/><text class="name" x="960" y="535">Killzone</text><text class="name" x="960" y="560">Aperture</text><text class="effect" x="960" y="592"><tspan x="960">expands tower</tspan><tspan x="960" dy="19">firing sector</tspan></text>
+      <rect class="node skill" x="1040" y="500" width="160" height="150" rx="12"/><text class="name" x="1120" y="535">Spectral</text><text class="name" x="1120" y="560">Relay</text><text class="effect" x="1120" y="592"><tspan x="1120">reveals upgrades,</tspan><tspan x="1120" dy="19">then full map</tspan></text>
+      <rect class="node skill" x="1420" y="500" width="160" height="150" rx="12"/><text class="name" x="1500" y="535">Adrenaline</text><text class="name" x="1500" y="560">Surge</text><text class="effect" x="1500" y="592"><tspan x="1500">active: all enemy</tspan><tspan x="1500" dy="19">Kethra speed up</tspan></text>
+      <rect class="node skill" x="1580" y="500" width="160" height="150" rx="12"/><text class="name" x="1660" y="535">Saturation</text><text class="name" x="1660" y="560">Burst</text><text class="effect" x="1660" y="592"><tspan x="1660">active: hits all</tspan><tspan x="1660" dy="19">in Killzone</tspan></text>
+      <rect class="node skill" x="1740" y="500" width="160" height="150" rx="12"/><text class="name" x="1820" y="535">Phase</text><text class="name" x="1820" y="560">Bastion</text><text class="effect" x="1820" y="592"><tspan x="1820">active: enemy</tspan><tspan x="1820" dy="19">Kethra shield</tspan></text>
+    </g>
+    <g><!-- Ultimates utility -->
+      <rect class="node open" x="20" y="190" width="160" height="160" rx="12"/><text class="tag" x="100" y="225">ULTIMATE</text><text class="name" x="100" y="260">OPEN</text><text class="effect" x="100" y="292">Echo candidate</text>
+      <rect class="node open" x="180" y="190" width="160" height="160" rx="12"/><text class="tag" x="260" y="225">ULTIMATE</text><text class="name" x="260" y="260">OPEN</text><text class="effect" x="260" y="292">Battery candidate</text>
+      <rect class="node open" x="340" y="190" width="160" height="160" rx="12"/><text class="tag" x="420" y="225">ULTIMATE</text><text class="name" x="420" y="260">OPEN</text><text class="effect" x="420" y="292">Reclamation candidate</text>
+      <rect class="node open" x="720" y="190" width="160" height="160" rx="12"/><text class="tag" x="800" y="225">ULTIMATE</text><text class="name" x="800" y="260">OPEN</text><text class="effect" x="800" y="292">Pain candidate</text>
+      <rect class="node open" x="880" y="190" width="160" height="160" rx="12"/><text class="tag" x="960" y="225">ULTIMATE</text><text class="name" x="960" y="260">OPEN</text><text class="effect" x="960" y="292">Aperture candidate</text>
+      <rect class="node open" x="1040" y="190" width="160" height="160" rx="12"/><text class="tag" x="1120" y="225">ULTIMATE</text><text class="name" x="1120" y="260">OPEN</text><text class="effect" x="1120" y="292"><tspan x="1120">targeting control</tspan><tspan x="1120" dy="19">is family direction</tspan></text>
+      <rect class="node open" x="1420" y="190" width="160" height="160" rx="12"/><text class="tag" x="1500" y="225">ULTIMATE</text><text class="name" x="1500" y="260">OPEN</text><text class="effect" x="1500" y="292">active candidate</text>
+      <rect class="node open" x="1580" y="190" width="160" height="160" rx="12"/><text class="tag" x="1660" y="225">ULTIMATE</text><text class="name" x="1660" y="260">OPEN</text><text class="effect" x="1660" y="292">active candidate</text>
+      <rect class="node open" x="1740" y="190" width="160" height="160" rx="12"/><text class="tag" x="1820" y="225">ULTIMATE</text><text class="name" x="1820" y="260">OPEN</text><text class="effect" x="1820" y="292">active candidate</text>
+    </g>
+    <rect class="node base" x="690" y="1120" width="540" height="160" rx="18"/><text class="name" x="960" y="1175">UTILITY BASE</text><text class="effect" x="960" y="1210"><tspan x="960">Flux is earned from kills and Flux Yield. Core Strain is the pressure limit.</tspan><tspan x="960" dy="23">Only Surge Core can add active abilities; every other family is passive.</tspan></text>
+  </g>
+</svg>
