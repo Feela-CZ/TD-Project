@@ -1,4 +1,5 @@
 import { BOT_PROFILES, LiveMatch, ULTIMATE_COST, UPGRADE_GROUPS, TIER1_MAX_LEVEL, TIER2_MAX_LEVEL, TIER2_FAMILIES, TIER3_FAMILIES, damageRange, killFluxForCreep, visualLaneForCreep } from '../dist/live.mjs';
+import { createTouchUi } from './touch-ui.mjs';
 
 const canvas = document.querySelector('#arena');
 const context = canvas.getContext('2d');
@@ -37,7 +38,7 @@ let treeState = { root:null, choice:null, detailed:false };
 const CORE_ICONS = Object.freeze({ offense:'✹', mutation:'✥', utility:'◇' });
 const NODE_ICONS = Object.freeze({ damage:'◉', attackSpeed:'≋', crit:'⌖', armor:'⬡', speed:'↟', maxHp:'◍', interest:'◌', rewardFloor:'▣', overdrive:'⚡' });
 const NODE_INFO = Object.freeze({
-  damage: ['Progressively raises base Round damage from 24–30 to 45–57.', 'Every Round, including physical split shots, begins with this range. Nine ranks preserve the approved final 45–57 endpoint while making each purchase a smaller, meaningful step.'],
+  damage: ['Raises innate Round damage by 5% per rank, up to +45%.', 'Every permanent upgrade across all branches also adds 1 damage. Fortress output shows the current combined range; hit-specific effects apply afterwards.'],
   attackSpeed: ['Raises the fortress firing rate from 1.00 to 1.60 rounds per second.', 'Cadence is the permanent firing-rate layer. Combat Rhythm and temporary effects then multiply this live value; the Output panel always shows the current result.'],
   crit: ['Builds the base critical chance from 0% to 30%.', 'Precision sets the basic chance for a Round to become critical. Tier II can add chance or improve its multiplier, so the live critical total is shown separately.'],
   armor: ['Gradually raises the armor inherited by every spawned Kethra.', 'Carapace is applied at spawning. Its nine ranks lead to the current approved maximum rather than creating a stronger end state.'],
@@ -246,8 +247,11 @@ function drawFogOverlay(reconLevel, opponent) {
 }
 const branchForRoot = (root) => ['damage','attackSpeed','crit'].includes(root) ? 'offense' : ['armor','speed','maxHp'].includes(root) ? 'mutation' : 'utility';
 const groupForCore = (core) => UPGRADE_GROUPS.find((group) => group.title.toLowerCase() === core);
+let treeRenderKey = '', actionRenderKey = '';
 function renderSkillTree(snapshot) {
   const player = snapshot.players.human;
+  const key=JSON.stringify([treeState,running,player.tower,player.mutations,player.tier2,player.tier3,player.nextTier1Cost,player.nextTier2Cost,player.energy>=ULTIMATE_COST]);
+  if(key===treeRenderKey) return; treeRenderKey=key;
   skillTree.innerHTML = UPGRADE_GROUPS.map((group) => `<section class="tree-core"><h3>${group.title}</h3>${group.nodes.map(([root, label]) => {
     const levels = root in player.tower ? player.tower : player.mutations, level = levels[root], expanded = treeState.root === root;
     const selectedRoots = group.nodes.filter(([candidate]) => (candidate in player.tower ? player.tower[candidate] : player.mutations[candidate]) > 0).length;
@@ -264,6 +268,8 @@ const isFreeUltimate = (id) => id === 'avariceEngine';
 skillTree.addEventListener('click', (event) => { const button = event.target.closest('button'); if (!button) return; if (button.dataset.treeRoot) treeState = { root:treeState.root === button.dataset.treeRoot ? null : button.dataset.treeRoot, choice:null, detailed:false }; else if (button.dataset.treeTier2) treeState = { ...treeState, choice:button.dataset.treeTier2 }; else if (button.dataset.treeDetail !== undefined) treeState = { ...treeState, detailed:!treeState.detailed }; else if (button.dataset.buyTier1 !== undefined) match.buy(treeState.root in match.players.human.tower ? 'tower' : 'mutation', treeState.root); else if (button.dataset.buyTier2) match.buyTier2(treeState.root, button.dataset.buyTier2); else if (button.dataset.buyTier3) match.buyTier3(treeState.root, button.dataset.buyTier3); render(match.snapshot()); });
 function renderActionDock(snapshot) {
   const player = snapshot.players.human, actions = [], owned = Object.values(player.tier3).flatMap((choices) => Object.entries(choices).filter(([,value]) => value).map(([id]) => id));
+  const key=JSON.stringify([running,player.tower.overdrive,player.tier2.overdrive,owned,player.priorityMode,Math.ceil(player.overdriveCooldown),Object.entries(player.activeCooldowns).map(([k,v])=>[k,Math.ceil(v)]),Object.entries(player.ultimateCooldowns).map(([k,v])=>[k,Math.ceil(v)])]);
+  if(key===actionRenderKey) return; actionRenderKey=key;
   if (player.tower.overdrive) actions.push(`<button data-action="overdrive" ${!running || player.overdriveCooldown > 0 ? 'disabled' : ''}>Surge Core ${player.overdriveCooldown > 0 ? `${Math.ceil(player.overdriveCooldown)} s` : 'Ready'}</button>`);
   for (const choice of TIER2_FAMILIES.overdrive) { const level = player.tier2.overdrive[choice.id], cooldown = player.activeCooldowns[choice.id] ?? 0; if (level) actions.push(`<button data-active="${choice.id}" ${!running || cooldown > 0 ? 'disabled' : ''}>${choice.label}${cooldown > 0 ? ` · ${Math.ceil(cooldown)} s` : ''}</button>`); }
   if (owned.includes('commandOverride')) actions.push(`<div class="action-group"><span>Command Override · ${player.priorityMode}</span><button data-priority="default">Default</button><button data-priority="veteran">Veteran</button><button data-priority="lowest">Lowest HP</button><button data-priority="highest">Highest HP</button><button data-priority="manual">Manual</button></div>`);
@@ -300,8 +306,18 @@ function render(snapshot) {
   document.querySelectorAll('.ability').forEach((button) => { const level = human.tier2.overdrive[button.dataset.choice]; const cooldown = human.activeCooldowns[button.dataset.choice] ?? 0; button.disabled = !running || !level || cooldown > 0; button.textContent = !level ? `${TIER2_FAMILIES.overdrive.find((entry) => entry.id === button.dataset.choice).label} — locked` : cooldown > 0 ? `${TIER2_FAMILIES.overdrive.find((entry) => entry.id === button.dataset.choice).label} — ${Math.ceil(cooldown)} s` : `${TIER2_FAMILIES.overdrive.find((entry) => entry.id === button.dataset.choice).label}`; });
   document.querySelectorAll('.ultimate').forEach((button) => { const id = button.dataset.ultimateActive; const owned = Object.values(human.tier3).some((choices) => choices[id]); const cooldown = human.ultimateCooldowns?.[id] ?? 0; const label = Object.values(TIER3_FAMILIES).flat().find((entry) => entry.id === id).label; button.disabled = !running || !owned || cooldown > 0; button.textContent = !owned ? `${label} — locked` : cooldown > 0 ? `${label} — ${Math.ceil(cooldown)} s` : label; });
   recon.hidden = !versus || !reconLevel; if (versus && reconLevel) { const roots = [...Object.entries(bot.tower).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`), ...Object.entries(bot.mutations).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`)].join(', ') || 'none'; const specializations = Object.entries(bot.tier2).map(([root, choices]) => `${root}: ${Object.entries(choices).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`).join(', ') || 'none'}`).join(' | '); const ultimates = Object.values(bot.tier3).flatMap((choices) => Object.entries(choices).filter(([, value]) => value).map(([id]) => id)).join(', ') || 'none'; const composition = bot.creeps.reduce((memo, creep) => { memo[creep.form] = (memo[creep.form] ?? 0) + 1; return memo; }, {}); const compositionText = Object.entries(composition).map(([form, count]) => `${form} ×${count}`).join(', ') || 'no active Kethra'; const cooldowns = [...Object.entries(bot.activeCooldowns).map(([id, value]) => `${id} ${Math.ceil(value)}s`), ...Object.entries(bot.ultimateCooldowns).map(([id, value]) => `${id} ${Math.ceil(value)}s`)].join(' · '); recon.innerHTML = `<h3>Spectral Relay rank ${reconLevel}</h3><p>Bot Core Strain: ${bot.load}/${bot.overloadCap}</p><p>${bot.purchaseLog.map((entry) => entry.label).join(' · ') || 'The bot has not purchased yet.'}</p>${reconLevel >= 2 ? `<p>Tier I: ${roots}</p>` : ''}${reconLevel >= 3 ? `<p>Tier II: ${specializations}</p>` : ''}${reconLevel >= 4 ? `<p>Live composition: ${compositionText}</p><p>Cooldown telemetry: ${cooldowns}</p>` : ''}${reconLevel >= TIER2_MAX_LEVEL ? `<p>Ultimates: ${ultimates}</p>` : ''}`; }
-  renderSkillTree(snapshot); renderActionDock(snapshot);
+  renderSkillTree(snapshot); renderActionDock(snapshot); touchUi.refresh();
   result.hidden = !snapshot.result; result.textContent = snapshot.result ?? '';
 }
 function frame(now) { if (running) { const elapsed = previous ? (now - previous) / 1000 : 0; match.step(elapsed); const snapshot = match.snapshot(); if (snapshot.result) running = false; render(snapshot); } previous = now; requestAnimationFrame(frame); }
+const touchUi = createTouchUi({snapshot:() => latestSnapshot ?? match.snapshot(), isRunning:()=>running, descriptions:NODE_INFO, icons:NODE_ICONS, purchase:(tier,root,id) => {
+  if (!running) { status.textContent='Start the match before upgrading.'; return; }
+  if(tier===1) match.buy(root in match.players.human.tower ? 'tower' : 'mutation',root);
+  else if(tier===2) match.buyTier2(root,id); else match.buyTier3(root,id);
+  render(match.snapshot());
+}});
+canvas.addEventListener('click', event => {
+  const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*420/rect.width,y=(event.clientY-rect.top)*700/rect.height;
+  if(mapView==='human' && Math.hypot(x-210,y-584)<58) touchUi.open();
+});
 setModeUi(); render(match.snapshot()); requestAnimationFrame(frame);
