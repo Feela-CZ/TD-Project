@@ -3,19 +3,21 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#06101f">
-    <title>Tower Defense — local alpha</title>
+    <meta name="theme-color" content="#101512">
+    <title>Kethra Incursion</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="mobile.css">
   </head>
   <body>
     <main>
       <header class="masthead">
-        <div><p class="eyebrow">LOCAL PC ALPHA</p><h1>Tower Defense</h1><p id="subtitle" class="subtitle">Solo progression — clear Wave 60</p></div>
+        <div><h1>Kethra Incursion</h1><p id="subtitle" class="subtitle">Solo progression — clear Wave 60</p></div>
         <div class="actions"><label class="mode">Mode <select id="mode"><option value="solo" selected>Solo progression</option><option value="versus">Versus bot</option></select></label><label id="bot-profile-label" class="mode" hidden>Bot <select id="bot-profile"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="economy">Economy</option><option value="mutation">Mutation-heavy</option></select></label><button id="start" class="primary">Start match</button><button id="restart">Restart match</button></div>
       </header>
       <section class="desktop-shell">
         <aside class="side-panel left-panel" aria-label="Match overview">
+          <button type="button" class="overview-close">Close overview</button>
+          <button type="button" class="overview-restart">Restart match</button>
           <section id="status" class="status" aria-live="polite">Ready. Start the match.</section>
           <section class="panel"><h2>Match</h2><dl class="metric-grid"><div><dt>Time</dt><dd id="clock">00:00</dd></div><div><dt>Incursion</dt><dd id="incursion">1 / 60</dd></div><div><dt>Next Incursion</dt><dd id="incursion-next">45.0 s</dd></div><div><dt>Core Strain</dt><dd id="overload">0 / 100</dd></div><div data-bot-strain hidden><dt>Opponent Strain</dt><dd id="bot-overload">—</dd></div></dl></section>
           <section class="panel economy" aria-label="Flux economy"><h2>Flux economy</h2><dl class="metric-grid"><div><dt>Available Flux</dt><dd id="energy">150</dd></div><div><dt>Flux earned</dt><dd id="human-earned">0.0</dd></div><div><dt>Interest earned</dt><dd id="human-interest">0.0</dd></div><div><dt>Avarice gained</dt><dd id="human-avarice">0.0</dd></div><div><dt>Interest rate</dt><dd id="human-interest-rate">2.50% / 6s</dd></div><div><dt>Next interest</dt><dd id="human-interest-next">6.0 s · +3.8</dd></div></dl><details class="explain"><summary>How Flux works</summary><p>Kethra kills grant Flux immediately. Every 6 seconds, interest is calculated from available Flux at the displayed rate. “Interest earned” is the running total from those ticks; it is not the next payout. Echo and Avarice, if unlocked, are included in the estimate of the next tick.</p></details></section>
@@ -23,11 +25,42 @@
           <section id="map-nav" class="map-nav" aria-label="Map settings"><button id="portrait-map" type="button">Opponent</button><details class="settings"><summary>Settings</summary><label><input id="swipe-map" type="checkbox" checked> Swipe horizontally on the map to switch sector</label></details></section>
           <section id="action-dock" class="action-dock panel" aria-label="Active abilities"><h2>Active abilities</h2><p class="muted">Unlock abilities in Surge Core.</p></section>
         </aside>
-        <section class="game-stage"><section class="arena-wrap"><section class="portrait-hud" aria-label="Combat HUD"><div><strong id="portrait-flux">150</strong><span>Flux</span><small id="portrait-prices">T1 free · T2 120 · T3 2800</small></div><div><strong id="portrait-wave">W1</strong><span>Incursion</span></div><div><button id="portrait-tempo" type="button" disabled>Tempo</button></div></section><canvas id="arena" width="420" height="700" aria-label="Tower Defense arena">Your browser does not support Canvas.</canvas><div id="result" class="result" hidden></div></section></section>
-        <aside class="side-panel right-panel" aria-label="Upgrade tree"><section class="panel tree-panel"><div class="panel-heading"><div><h2>Upgrade tree</h2><p>Tier I unlocks its matching Tier II. Choose two paths in each family.</p></div><span id="tree-prices">T1 free · T2 120</span></div><section id="skill-tree" class="skill-tree" aria-live="polite"></section></section></aside>
+        <section class="game-stage"><section class="arena-wrap"><section class="portrait-hud" aria-label="Combat HUD"><div><strong id="portrait-flux">150</strong><span>Flux</span></div><div><strong id="portrait-wave">W1</strong><span>Incursion</span></div><div><button id="portrait-tempo" type="button" disabled>Tempo</button></div></section><canvas id="arena" width="420" height="700" aria-label="Tower Defense arena">Your browser does not support Canvas.</canvas><div id="result" class="result" hidden></div></section>
+          <p class="phone-telemetry"></p>
+          <nav class="phone-toolbar" aria-label="Game controls"><button type="button" data-open aria-haspopup="dialog">Upgrades</button><button type="button" data-rival>Opponent</button><button type="button" data-stats>Overview</button></nav>
+        </section>
+        <aside class="side-panel right-panel" aria-label="Fortress upgrades">
+          <section id="upgrade-panel" class="upgrade-panel">
+            <header class="upgrade-heading">
+              <h2 id="upgrade-title" data-upgrade-heading tabindex="-1">Upgrade fortress</h2>
+              <output data-panel-flux aria-live="off"></output>
+              <button type="button" class="upgrade-mobile" data-close-upgrade aria-label="Close upgrades">Close</button>
+            </header>
+            <nav class="upgrade-tabs" aria-label="Upgrade branches">
+              <button type="button" data-group="0">Offense</button>
+              <button type="button" data-group="1">Mutation</button>
+              <button type="button" data-group="2">Utility</button>
+            </nav>
+            <section class="upgrade-section" aria-label="Tier I">
+              <h3>Tier I</h3>
+              <div class="upgrade-options" data-families></div>
+            </section>
+            <section class="upgrade-section" aria-label="Tier II">
+              <div class="upgrade-caption"><h3>Tier II</h3><span data-tier2-hint></span></div>
+              <div class="upgrade-options" data-specializations></div>
+            </section>
+            <section data-upgrade-details aria-label="Selected upgrades"></section>
+            <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
+            <div class="confirmation" data-confirmation hidden>
+              <p></p><button type="button" data-cancel-upgrade>Cancel</button><button type="button" data-confirm-upgrade>Confirm purchase</button>
+            </div>
+            <label class="upgrade-mobile confirm-preference"><input type="checkbox" data-confirm-preference checked> Confirm purchases</label>
+          </section>
+        </aside>
       </section>
-      <section class="controls" hidden aria-label="Legacy upgrade controls"><div><p id="tier1-price"></p><div id="upgrade-groups"></div><p id="tier2-price"></p><div id="tier2-groups"></div><div id="tier3-groups"></div></div><aside class="overdrive"><p id="overdrive-note"></p><button id="overdrive"></button><div id="active-abilities"></div><div id="ultimate-abilities"></div><section class="tempo"><p id="tempo-note"></p><button id="tempo"></button></section><div id="recon"></div><p class="bot-note"></p></aside></section>
-      <footer><span>Incursion every 45 s · 60 maximum</span><span>Killzone: 30% of track</span><span>Round flight: 0.25 s</span></footer>
+      <dialog class="upgrade-sheet" id="upgrade-sheet" aria-labelledby="upgrade-title"></dialog>
+      <section id="recon" class="controls" hidden></section>
+      <footer>Incursions every 45 seconds · Hold your fortress through wave 60</footer>
     </main>
     <script type="module" src="app.mjs"></script>
   </body>

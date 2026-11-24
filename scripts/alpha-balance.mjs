@@ -6,7 +6,7 @@ const runs = positive(process.argv.find((value) => value.startsWith('--runs='))?
 const output = resolve(process.cwd(), process.argv.find((value) => value.startsWith('--output='))?.slice(9) ?? 'results/alpha-tier3-baseline');
 const controlled = process.argv.includes('--controlled');
 const solo = process.argv.includes('--solo');
-const killFluxMultiplier = finite(process.argv.find((value) => value.startsWith('--kill-flux='))?.slice(12), 1.5);
+const killFluxMultiplier = finite(process.argv.find((value) => value.startsWith('--kill-flux='))?.slice(12), 1);
 const interestRateMultiplier = finite(process.argv.find((value) => value.startsWith('--interest-rate='))?.slice(16), 1);
 const seeds = Array.from({ length: runs }, (_, index) => 20260828 + index * 97);
 
@@ -15,45 +15,45 @@ const seeds = Array.from({ length: runs }, (_, index) => 20260828 + index * 97);
 const plans = {
   ordnanceCadence: [
     ['root','tower','damage',1], ['root','tower','attackSpeed',1],
-    ['tier2','damage','reaper',2], ['tier2','damage','multishot',2],
+    ['tier2','damage','reaper',5], ['tier2','damage','multishot',2],
     ['tier2','attackSpeed','burn',2], ['tier2','attackSpeed','rhythm',2],
     ['ultimate','damage','cullingEdict',1]
   ],
   cadencePrecision: [
     ['root','tower','attackSpeed',1], ['root','tower','crit',1],
-    ['tier2','attackSpeed','rhythm',2], ['tier2','crit','critChance',2],
+    ['tier2','attackSpeed','rhythm',5], ['tier2','crit','critChance',2],
     ['tier2','crit','critMultiplier',2], ['ultimate','attackSpeed','overclockProtocol',1]
   ],
   focusCadence: [
     ['root','tower','attackSpeed',1], ['root','tower','crit',1],
-    ['tier2','attackSpeed','rhythm',2], ['tier2','crit','critChance',2],
+    ['tier2','attackSpeed','rhythm',2], ['tier2','crit','critChance',5],
     ['tier2','crit','staticCharge',2], ['ultimate','crit','focusCascade',1]
   ],
   precisionControl: [
     ['root','tower','crit',1], ['root','tower','damage',1], ['root','tower','rewardFloor',1],
-    ['tier2','crit','staticCharge',2], ['tier2','crit','critChance',2], ['tier2','rewardFloor','expandedField',2],
+    ['tier2','crit','staticCharge',5], ['tier2','crit','critChance',2], ['tier2','rewardFloor','expandedField',2],
     ['ultimate','crit','arcStagger',1]
   ],
   reservesOffense: [
     ['root','tower','interest',1], ['root','tower','overdrive',1],
-    ['tier2','interest','echo',2], ['tier2','interest','recovery',2],
+    ['tier2','interest','echo',5], ['tier2','interest','recovery',2],
     ['ultimate','interest','avariceEngine',1], ['root','tower','damage',1],
     ['root','tower','attackSpeed',1], ['tier2','damage','reaper',2]
   ],
   reservesBridge: [
     ['root','tower','damage',1], ['root','tower','attackSpeed',1], ['root','tower','interest',1],
     ['tier2','damage','reaper',2], ['tier2','damage','multishot',2],
-    ['tier2','interest','echo',2], ['tier2','interest','recovery',2], ['ultimate','interest','avariceEngine',1]
+    ['tier2','interest','echo',5], ['tier2','interest','recovery',2], ['ultimate','interest','avariceEngine',1]
   ],
   mutationPressure: [
     ['root','mutation','maxHp',1], ['root','mutation','speed',1],
-    ['tier2','maxHp','homeostasis',2], ['tier2','speed','kinetic',2],
+    ['tier2','maxHp','homeostasis',2], ['tier2','speed','kinetic',5],
     ['tier2','speed','phaseSkip',2], ['ultimate','speed','pressureDrive',1],
     ['root','tower','damage',1], ['root','tower','attackSpeed',1]
   ],
   fullOrdnanceCadence: [
     ['root','tower','damage',1], ['root','tower','attackSpeed',1],
-    ['tier2','damage','reaper',2], ['tier2','damage','multishot',2],
+    ['tier2','damage','reaper',5], ['tier2','damage','multishot',2],
     ['tier2','attackSpeed','burn',2], ['tier2','attackSpeed','rhythm',2],
     ['root','tower','damage',3], ['root','tower','attackSpeed',3],
     ['ultimate','damage','cullingEdict',1]
@@ -61,26 +61,59 @@ const plans = {
   fullFocusCadence: [
     ['root','tower','attackSpeed',1], ['root','tower','crit',1],
     ['tier2','attackSpeed','burn',2], ['tier2','attackSpeed','rhythm',2],
-    ['tier2','crit','critChance',2], ['tier2','crit','staticCharge',2],
+    ['tier2','crit','critChance',5], ['tier2','crit','staticCharge',2],
     ['root','tower','attackSpeed',3], ['root','tower','crit',3],
     ['ultimate','crit','focusCascade',1]
   ],
   fullReservesBridge: [
     ['root','tower','damage',1], ['root','tower','attackSpeed',1], ['root','tower','interest',1],
     ['tier2','damage','reaper',2], ['tier2','damage','cryo',2],
-    ['tier2','attackSpeed','requiem',2], ['tier2','attackSpeed','rhythm',2],
-    ['tier2','interest','echo',2], ['tier2','interest','recovery',2],
+    ['tier2','attackSpeed','requiem',5], ['tier2','attackSpeed','rhythm',2],
+    ['tier2','interest','echo',5], ['tier2','interest','recovery',2],
     ['root','tower','damage',3], ['root','tower','attackSpeed',3], ['root','tower','interest',3],
     ['ultimate','attackSpeed','funeralCircuit',1], ['ultimate','interest','avariceEngine',1]
+  ],
+  sustainedOffense: [
+    ['root','tower','damage',1], ['root','tower','attackSpeed',1],
+    ['tier2','damage','reaper',1], ['tier2','damage','multishot',1],
+    ['root','tower','attackSpeed',4], ['root','tower','damage',4],
+    ['tier2','attackSpeed','burn',2], ['tier2','damage','reaper',5],
+    ['root','tower','attackSpeed',9], ['root','tower','damage',9],
+    ['tier2','damage','multishot',5], ['tier2','attackSpeed','burn',5],
+    ['ultimate','damage','cullingEdict',1]
+  ],
+  wideSector: [
+    ['root','tower','damage',1], ['root','tower','attackSpeed',1], ['root','tower','rewardFloor',1],
+    ['tier2','rewardFloor','expandedField',1], ['tier2','damage','reaper',2],
+    ['root','tower','attackSpeed',5], ['tier2','damage','multishot',3],
+    ['root','tower','damage',6], ['tier2','rewardFloor','expandedField',5],
+    ['tier2','damage','reaper',5], ['root','tower','damage',9], ['root','tower','attackSpeed',9],
+    ['ultimate','rewardFloor','commandOverride',1]
   ]
 };
 
 const report = { generatedAt:new Date().toISOString(), runs, seeds, killFluxMultiplier, interestRateMultiplier, model:controlled?'LiveMatch at 0.1-second deterministic ticks; test-only 5000 starting Flux to exercise legal Ultimate interactions.':solo?'Solo progression LiveMatch at 0.1-second deterministic ticks; no bot purchases, no opponent terminal, standard incoming Kethra, and no injected Flux.':'LiveMatch at 0.1-second deterministic ticks; no injected Flux; Tier-III plans are retried only after legal prerequisites and real affordability.', scenarios:{} };
+for (const [name, plan] of Object.entries(plans)) validatePlan(name, plan);
 for (const [name, plan] of Object.entries(plans)) report.scenarios[name] = summarize(seeds.map((seed) => play(seed, plan)));
 await mkdir(output, { recursive:true });
 await writeFile(resolve(output,'simulation-report.json'), `${JSON.stringify(report,null,2)}\n`);
 await writeFile(resolve(output,'simulation-report.md'), markdown(report));
 console.log(`Alpha balance report: ${resolve(output,'simulation-report.md')}`);
+
+function validatePlan(name, plan) {
+  const match = new LiveMatch(1, { botEnabled:false });
+  match.players.human.energy = 100_000;
+  for (const intent of plan) {
+    let snapshot = match.snapshot();
+    while (level(snapshot, intent) < intent[3]) {
+      const before = level(snapshot, intent);
+      apply(match, intent);
+      snapshot = match.snapshot();
+      if (level(snapshot, intent) !== before + 1) throw new Error(`[${name}] Invalid purchase ${intent.join('/')}: ${snapshot.message}`);
+    }
+    if (level(snapshot, intent) !== intent[3]) throw new Error(`[${name}] Invalid rank or unknown upgrade: ${intent.join('/')}`);
+  }
+}
 
 function play(seed, plan) {
   const match = new LiveMatch(seed,{killFluxMultiplier,interestRateMultiplier,botEnabled:!solo,soloProgression:solo}); if(controlled)match.players.human.energy=5000; let cursor = 0; let planCompletedAt = null; let nextUltimateAt = 0;

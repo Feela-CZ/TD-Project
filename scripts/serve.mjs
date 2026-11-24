@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 
@@ -14,17 +14,28 @@ const server = createServer(async (request, response) => {
     return;
   }
   const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
-  const relative = pathname === '/' ? 'web/index.html' : pathname.replace(/^\/+/, '');
+  if (pathname === '/' || pathname === '/web') {
+    response.writeHead(302, { Location: '/web/' }).end();
+    return;
+  }
+  const relative = pathname === '/web/' ? 'web/index.html' : pathname.replace(/^\/+/, '');
   const file = resolve(project, relative);
   if (!file.startsWith(`${project}${sep}`)) {
     response.writeHead(403).end();
     return;
   }
   try {
-    await access(file);
+    if (!(await stat(file)).isFile()) {
+      response.writeHead(404).end();
+      return;
+    }
     response.writeHead(200, { 'Content-Type': types[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
     if (request.method === 'HEAD') response.end();
-    else createReadStream(file).pipe(response);
+    else {
+      const stream = createReadStream(file);
+      stream.on('error', () => response.destroy());
+      stream.pipe(response);
+    }
   } catch {
     response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
   }

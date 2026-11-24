@@ -1,0 +1,46 @@
+name: Verify Kethra Incursion
+
+on:
+  workflow_call:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ['td-rescue/**']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install browser test dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/kethra-tests" --no-save --no-package-lock playwright@1.62.1
+          "$RUNNER_TEMP/kethra-tests/node_modules/.bin/playwright" install --with-deps chromium
+          echo "PLAYWRIGHT_MODULE=$RUNNER_TEMP/kethra-tests/node_modules/playwright" >> "$GITHUB_ENV"
+      - name: Assemble the playtest
+        run: |
+          npm run build
+          node scripts/package-web.mjs
+          node scripts/package-preview.mjs
+      - name: Verify the built game and offline playtest
+        run: npm run verify:all
+        env:
+          KETHRA_SCREENSHOTS: ${{ runner.temp }}/kethra-screenshots
+          KETHRA_PREVIEW_FILE: release-web/Kethra_Incursion_Playtest.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kethra-Incursion-playtest
+          path: release-web/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence
+          path: ${{ runner.temp }}/kethra-screenshots
+          if-no-files-found: ignore

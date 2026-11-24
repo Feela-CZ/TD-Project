@@ -32,7 +32,13 @@ Open the displayed local URL, select Solo progression or Versus bot, then press 
 npm run verify
 ```
 
-The verification gate covers deterministic core behaviour, progression, damage/HP ranges, delayed projectiles, cooldowns and multi-target Overdrive.
+For the full release gate, use `npm run verify:all`. It adds the live match,
+upgrade matrix, Ultimates, and real desktop and touch Chromium purchase flows.
+[The verification workflow](.github/workflows/verify.yml) installs the browser
+dependencies and stores the screenshots and playtest package. For a local run,
+make `playwright` available to Node or point `PLAYWRIGHT_MODULE` to an existing
+installation. Install Chromium through Playwright or set `KETHRA_BROWSER`
+to a local Chromium-based executable.
 
 ## Portable tester build
 
@@ -40,7 +46,7 @@ The verification gate covers deterministic core behaviour, progression, damage/H
 npm run package:web
 ```
 
-This produces a self-contained browser package under `release-web/` for offline Windows playtesting.
+This produces a self-contained browser package under `release-web/` for offline Windows playtesting. For a single HTML file that opens directly in a modern browser, run `npm run build` followed by `node scripts/package-preview.mjs`.
 
 ## Technical notes
 

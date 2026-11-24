@@ -89,10 +89,10 @@ tierTree.buyTier2('interest', 'echo');
 assert.equal(tierTree.snapshot().players.human.tier2.interest.echo, 0, 'three Tier-I purchases alone must not unlock a Tier-II family without its matching Tier-I L1');
 tierTree.buyTier2('damage', 'multishot');
 tierTree.buyTier2('damage', 'reaper');
-assert.equal(tierTree.snapshot().players.human.tier2.damage.multishot, 1, 'Tier-II must unlock after three Tier-I purchases');
+assert.equal(tierTree.snapshot().players.human.tier2.damage.multishot, 1, 'Tier-II must unlock with the matching Tier-I rank');
 assert.equal(tierTree.snapshot().players.human.tier2.damage.reaper, 1, 'a second Tier-II choice must be purchasable');
-tierTree.buyTier2('damage', 'requiem');
-assert.equal(tierTree.snapshot().players.human.tier2.damage.requiem, 0, 'the third Tier-II choice must lock after two selections');
+tierTree.buyTier2('damage', 'cryo');
+assert.equal(tierTree.snapshot().players.human.tier2.damage.cryo, 0, 'the third Tier-II choice must lock after two selections');
 
 const ultimateTree = new LiveMatch(88);
 advance(ultimateTree, 0.05);
@@ -120,7 +120,7 @@ avarice.buy('tower', 'interest');
 avarice.players.human.energy = 2000;
 for (let level = 1; level <= TIER2_MAX_LEVEL; level += 1) avarice.buyTier2('interest', 'echo');
 avarice.buyTier3('interest', 'avariceEngine');
-assert.equal(avarice.snapshot().players.human.tier3.interest.avariceEngine, 1, 'Avarice Engine must be a free Ultimate unlocked by Echo Reserve L2');
+assert.equal(avarice.snapshot().players.human.tier3.interest.avariceEngine, 1, 'Avarice Engine must be a free Ultimate unlocked by Echo Reserve rank 5');
 avarice.players.human.interestEnergy = 150;
 avarice.players.human.energy = 1000;
 const avariceEarnedBeforeTick = avarice.players.human.earnedEnergy;
@@ -128,9 +128,19 @@ avarice.time = 5.99;
 avarice.players.human.nextInterestAt = 6;
 avarice.step(0.05);
 const avariceState = avarice.snapshot().players.human;
-assert.equal(avariceState.avariceEnergy, 1, 'Avarice Engine must pay from historical ordinary interest and respect the current-wave cap');
+assert.equal(avariceState.avariceEnergy, 0, 'Avarice Engine must wait for the late-wave ramp');
 assert.ok(avariceState.interestEnergy > 150, 'Avarice Engine must resolve after the ordinary interest tick');
-assert.ok(avariceState.earnedEnergy >= avariceEarnedBeforeTick + avariceState.avariceEnergy, 'Avarice payouts must enter earned Flux without contaminating ordinary interest');
+assert.ok(avariceState.earnedEnergy > avariceEarnedBeforeTick, 'ordinary interest must still credit the player');
+
+avarice.players.human.interestEnergy = 10_000;
+avarice.time = RULES.waveSeconds * 39 + 1;
+avarice.players.human.nextInterestAt = avarice.time;
+const lateBefore = avarice.snapshot().players.human;
+avarice.step(0.05);
+const lateAfter = avarice.snapshot().players.human;
+assert.equal(lateAfter.avariceEnergy, 40, 'late Avarice must apply the cap for the current wave');
+assert.ok(lateAfter.interestEnergy > lateBefore.interestEnergy, 'the ordinary-interest ledger must remain separate');
+assert.ok(lateAfter.earnedEnergy >= lateBefore.earnedEnergy + 40, 'Avarice must be credited to earned Flux');
 
 const tempo = new LiveMatch(101);
 advance(tempo, 0.05);
@@ -166,16 +176,16 @@ assert.equal(emergencyStatic.player.rhythmStacks, 1, 'Static Discharge must not 
 assert.equal(emergencyStatic.player.shots, 2, 'a forced crit Static discharge must not produce a further Static cascade');
 
 const bioTarStatic = staticFixture(100);
-bioTarStatic.player.tier2.attackSpeed.cryo = TIER2_MAX_LEVEL;
+bioTarStatic.player.tier2.damage.cryo = TIER2_MAX_LEVEL;
 bioTarStatic.player.tier2.attackSpeed.burn = 1;
 Object.assign(bioTarStatic.primary, { hp: 100, maxHp: 100 });
 bioTarStatic.match.step(0.05); advance(bioTarStatic.match, 0.3);
-assert.equal(bioTarStatic.primary.slow, .24, 'Bio-Tar L2 must apply its approved slow to the primary hit');
-assert.equal(bioTarStatic.primary.burn.left, 5, 'Bio-Tar L2 plus Thermite must extend the primary burn to five ticks');
+assert.equal(bioTarStatic.primary.slow, .24, 'Bio-Tar rank 5 must apply its approved slow to the primary hit');
+assert.equal(bioTarStatic.primary.burn.left, 6, 'Bio-Tar rank 5 must add three ticks to the three-tick Thermite trace');
 advance(bioTarStatic.match, 0.3);
 assert.equal(bioTarStatic.secondary.slow, .24, 'Static Discharge must apply Bio-Tar to the secondary target');
 assert.ok(bioTarStatic.secondary.slowUntil > bioTarStatic.match.time + 1.65, 'the secondary Bio-Tar application must start a fresh full duration at impact');
-assert.equal(bioTarStatic.secondary.burn.left, 5, 'Static Discharge must apply a fresh Bio-Tar-extended Thermite trace');
+assert.equal(bioTarStatic.secondary.burn.left, 6, 'Static Discharge must apply a fresh Bio-Tar-extended Thermite trace');
 
 const terminalCreep = (wave) => ({ id: 1, hp: 1, maxHp: 1, progress: 0, baseSpeed: 0, completedLaps: 0, wave, weight: 1, traits: { homeostasis: 0, phaseSkip: 0 }, slowUntil: -Infinity, kineticUntil: -Infinity, adrenalineUntil: -Infinity });
 const w60Win = new LiveMatch(93);
@@ -211,10 +221,20 @@ advance(multiProjectile, 1.5);
 const multiProjectileState = multiProjectile.snapshot().players.human;
 assert.ok(multiProjectileState.shots >= shotsBeforeOverdrive + 2, 'Overdrive L1 must launch multiple physical projectiles while multiple valid creeps are present');
 
+function fluxFromFirstKill(multiplier) {
+  const match = new LiveMatch(10, { botEnabled: false, killFluxMultiplier: multiplier });
+  advance(match, 0.05);
+  match.players.human.creeps[0].hp = 0;
+  advance(match, 0.05);
+  return match.snapshot().players.human.earnedEnergy;
+}
+assert.equal(fluxFromFirstKill(1), killFluxForCreep(1, 0), 'the default live reward must match the browser rules');
+assert.equal(fluxFromFirstKill(2), fluxFromFirstKill(1) * 2, 'a simulation reward override must actually affect kill Flux');
+
 const economy = new LiveMatch(10);
-advance(economy, 12.05);
+advance(economy, 18.05);
 const economyState = economy.snapshot().players.human;
-assert.equal(economyState.interestEnergy, 1, 'fractional interest must roll forward until it pays a whole Flux');
+assert.equal(economyState.interestEnergy, 1, 'at 0.25% on 150 Flux, the third fractional interest tick must pay a whole Flux');
 assert.equal(economyState.earnedEnergy, 1, 'cumulative earned Flux must exclude starting Flux and retain whole numbers');
 assert.ok(economyState.nextInterestIn > 5.9 && economyState.nextInterestIn <= 6, 'the next-interest countdown must reset after a tick');
 
