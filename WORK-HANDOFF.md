@@ -1,0 +1,9 @@
+# Kethra Incursion · Work / Codex
+
+**Status · 2026-11-24** — Phase 0 audit in progress. Source baseline: [`main` at `d06e8a0`](https://github.com/Feela-CZ/TD-Project/commit/d06e8a0f99366f3f2039efbcef94d275aa523d3c). [Deployment record](https://github.com/Feela-CZ/TD-Project/actions/runs/34217824779).
+
+- **Next action:** Use an isolated build to reproduce the Tier II purchase path in desktop and touch layouts. Check prerequisites, price, confirmation, rank, Flux debit, activation or passive effect, and how the game explains an unavailable purchase. Finish the harness and game audit and present the G0 decision before implementing a fix.
+- **Evidence:** An in-memory check at the baseline exercised the core purchase and activation of Saturation Burst using normal starting Flux. Browser input has yet to be verified. `scripts/verify-mobile.mjs` exercises availability and model purchases with injected Flux. [Mobile review](reviews/MOBILE_UI_2026-09-08.md) documents the stale `verify:alpha` assertion and scope of prior verification.
+- **Build and checks:** Node.js 20+. Run `npm run build` in a task checkout, then `npm run verify`, `npm run verify:alpha`, and `node scripts/verify-mobile.mjs`. Use `npm run play` and the `/web/` path for local browser testing. Record the tested commit and actual results.
+- **Project direction:** After audit approval, stabilize and simplify controls, then evaluate distinct visual directions in a playable slice. Follow with simulation-backed balance and a verified release candidate. The owner decides creative direction and evaluates the feel of the game.
+- **Project references:** [Game README](README.md), [design baseline](spec/TOWER_DEFENSE_MASTER_HANDOFF_v7_2026-08-25.md), and [decision records](decisions/). This public handoff is coordination state. Independently verified project facts belong in the project’s audit process.
