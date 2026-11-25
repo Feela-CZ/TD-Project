@@ -2,6 +2,7 @@ import { BOT_PROFILES, LiveMatch, TIER2_MAX_LEVEL, TIER2_FAMILIES, TIER3_FAMILIE
 import { createTouchUi } from './touch-ui.mjs';
 import { createUpgradePanel } from './upgrade-panel.mjs';
 import { createArenaArt } from './arena-art.mjs';
+import { createTurretMotion, FORTRESS } from './turret-motion.mjs';
 
 const canvas = document.querySelector('#arena');
 const context = canvas.getContext('2d');
@@ -48,6 +49,7 @@ function resetMatch(active = false) {
   swipeStart = null;
   mapView = 'human';
   upgradePanel.reset();
+  for (const motion of Object.values(turrets)) motion.reset();
   render(match.snapshot());
 }
 mode.addEventListener('change', () => { setModeUi(); resetMatch(); });
@@ -57,7 +59,7 @@ restart.addEventListener('click', () => resetMatch(true));
 document.querySelector('#portrait-tempo').addEventListener('click', () => { if (!running) return; match.activateTempoCharge(); render(match.snapshot()); });
 portraitMap.addEventListener('click', () => setMapView(mapView === 'human' ? 'bot' : 'human'));
 canvas.addEventListener('pointerdown', (event) => { swipeStart = { x:event.clientX, y:event.clientY }; });
-canvas.addEventListener('pointerup', (event) => { if (!swipeStart) return; const dx = event.clientX - swipeStart.x, dy = event.clientY - swipeStart.y; const rect = canvas.getBoundingClientRect(), x = (event.clientX - rect.left) * canvas.width / rect.width, y = (event.clientY - rect.top) * canvas.height / rect.height; swipeStart = null; if (swipeMap.checked && mode.value === 'versus' && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) { setMapView(dx < 0 ? 'bot' : 'human'); return; } if (mapView === 'human' && pendingUltimateTarget) { const player = (latestSnapshot ?? match.snapshot()).players.human; const nearest = player.creeps.map((creep) => ({ creep, point:formationPoint(creep.progress, 'human', creep.id) })).sort((a,b) => Math.hypot(a.point.x-x,a.point.y-y)-Math.hypot(b.point.x-x,b.point.y-y))[0]; match.activateUltimate(pendingUltimateTarget, nearest?.creep.progress ?? .5); pendingUltimateTarget = null; render(match.snapshot()); return; } if (mapView === 'human' && (latestSnapshot ?? match.snapshot()).players.human.priorityMode === 'manual') { const player = (latestSnapshot ?? match.snapshot()).players.human; const nearest = player.creeps.map((creep) => ({ creep, point:formationPoint(creep.progress, 'human', creep.id) })).sort((a,b) => Math.hypot(a.point.x-x,a.point.y-y)-Math.hypot(b.point.x-x,b.point.y-y))[0]; if (nearest && Math.hypot(nearest.point.x-x,nearest.point.y-y) < 24) { match.setManualTarget(nearest.creep.id); render(match.snapshot()); return; } } if (mapView === 'human' && Math.hypot(dx, dy) < 12 && Math.hypot(x - 210, y - 584) < 58) upgradePanel.open(); });
+canvas.addEventListener('pointerup', (event) => { if (!swipeStart) return; const dx = event.clientX - swipeStart.x, dy = event.clientY - swipeStart.y; const rect = canvas.getBoundingClientRect(), x = (event.clientX - rect.left) * canvas.width / rect.width, y = (event.clientY - rect.top) * canvas.height / rect.height; swipeStart = null; if (swipeMap.checked && mode.value === 'versus' && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) { setMapView(dx < 0 ? 'bot' : 'human'); return; } if (mapView === 'human' && pendingUltimateTarget) { const player = (latestSnapshot ?? match.snapshot()).players.human; const nearest = player.creeps.map((creep) => ({ creep, point:formationPoint(creep.progress, 'human', creep.id) })).sort((a,b) => Math.hypot(a.point.x-x,a.point.y-y)-Math.hypot(b.point.x-x,b.point.y-y))[0]; match.activateUltimate(pendingUltimateTarget, nearest?.creep.progress ?? .5); pendingUltimateTarget = null; render(match.snapshot()); return; } if (mapView === 'human' && (latestSnapshot ?? match.snapshot()).players.human.priorityMode === 'manual') { const player = (latestSnapshot ?? match.snapshot()).players.human; const nearest = player.creeps.map((creep) => ({ creep, point:formationPoint(creep.progress, 'human', creep.id) })).sort((a,b) => Math.hypot(a.point.x-x,a.point.y-y)-Math.hypot(b.point.x-x,b.point.y-y))[0]; if (nearest && Math.hypot(nearest.point.x-x,nearest.point.y-y) < 24) { match.setManualTarget(nearest.creep.id); render(match.snapshot()); return; } } if (mapView === 'human' && Math.hypot(dx, dy) < 12 && Math.hypot(x - FORTRESS.x, y - FORTRESS.y) < 58) upgradePanel.open(); });
 canvas.addEventListener('pointercancel', () => { swipeStart = null; });
 
 function routePoint(progress, side) {
@@ -127,15 +129,50 @@ function drawKethra(creep, point, radius, baseColor) {
   context.restore();
 }
 function drawSide(player, side, color, visible) {
-  const tower = { x:210, y:584 };
+  const tower = FORTRESS;
   arenaArt.drawTrack(snapshotTime, color, visible ? player.killzoneCoverage : .3);
   if (player.conjunctionUntil > snapshotTime && player.conjunctionZone) { context.strokeStyle = '#d9bcff88'; context.lineWidth = 28; context.lineCap = 'round'; context.beginPath(); for (let p = player.conjunctionZone.start; p <= player.conjunctionZone.end + .001; p += .01) { const point = routePoint(Math.min(player.conjunctionZone.end,p), side); p > player.conjunctionZone.start ? context.lineTo(point.x,point.y) : context.moveTo(point.x,point.y); } context.stroke(); }
   for (const scar of player.breachScars.filter((scar) => !scar.remote && scar.end > snapshotTime)) { const point=routePoint(scar.progress,side), alpha=Math.min(1,(scar.end-snapshotTime)/.5); context.globalAlpha=alpha*.65; context.fillStyle='#ff7b57'; context.beginPath(); context.arc(point.x,point.y,23+Math.sin(snapshotTime*8)*3,0,Math.PI*2); context.fill(); context.globalAlpha=1; }
   for (const meteor of player.pendingMeteors) { const point=routePoint(meteor.progress,side); context.strokeStyle='#ffbd71'; context.setLineDash([3,4]); context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,18,0,Math.PI*2); context.stroke(); context.setLineDash([]); }
-  arenaArt.drawTower(tower, snapshotTime, color, side === 'human' ? 'YOUR FORTRESS' : 'RIVAL FORTRESS');
+  const points = new Map(visible ? player.creeps.map(creep => [creep.id, formationPoint(creep.progress, side, creep.id)]) : []);
+  const motion = turrets[side];
+  const pose = motion.update(snapshotTime, visible ? player.activeTargetId : null, visible ? player.projectiles : [], id => points.get(id), reduceMotion.matches);
+  arenaArt.drawTower(tower, color, side === 'human' ? 'YOUR FORTRESS' : 'RIVAL FORTRESS', pose);
   if (!visible) return;
-  for (const creep of player.creeps) { const point = formationPoint(creep.progress, side, creep.id); const hp = Math.max(0, creep.hp / creep.maxHp), radius=(creep.form?.includes('abomination')?18:creep.form?.includes('chimera')?12:creep.form==='fragment'?4:creep.form==='shard'?5:creep.form==='brood'?5:7)+(creep.boss?3:0); if (creep.slowUntil > snapshotTime) { context.strokeStyle = '#6ce5ff'; context.lineWidth = 2; context.shadowColor='#6ce5ff'; context.shadowBlur=8; context.beginPath(); context.arc(point.x, point.y + 5, radius+3, 0, Math.PI * 2); context.stroke(); context.shadowBlur=0; } if (creep.safeToken && creep.safeUntil > snapshotTime) { context.strokeStyle='#f7dc6f'; context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,radius+6,0,Math.PI*2); context.stroke(); } if (creep.chrysalisUntil > snapshotTime) { context.fillStyle='#c891ff77'; context.beginPath(); context.ellipse(point.x,point.y,radius+4,radius+8,0,0,Math.PI*2); context.fill(); } if (creep.burn) { context.fillStyle = '#ff8e46'; context.shadowColor='#ff5d3e'; context.shadowBlur=9; context.beginPath(); context.arc(point.x + radius*.7, point.y - radius, 3 + Math.sin(snapshotTime * 16 + creep.id), 0, Math.PI * 2); context.fill(); context.shadowBlur=0; } const baseColor = creep.boss?'#f3ad4f':creep.form?.includes('abomination')?'#b94c75':creep.form?.includes('chimera')?'#c47dff':creep.form==='fragment'?'#8bf2db':creepColor(creep, player); drawKethra(creep, point, radius, baseColor); context.fillStyle = '#081120'; context.fillRect(point.x - radius-1, point.y - radius - 9, (radius+1)*2, 3); context.fillStyle = hp > .35 ? '#77e6a0' : '#ff8a6d'; context.fillRect(point.x - radius-1, point.y - radius - 9, (radius+1)*2 * hp, 3); }
-  for (const projectile of player.projectiles) { const target = player.creeps.find((creep) => creep.id === projectile.targetId); if (!target) continue; const targetPoint = formationPoint(target.progress, side, target.id); const travel = Math.min(1, Math.max(0, (snapshotTime - projectile.firedAt) / (projectile.impactAt - projectile.firedAt))); const x = tower.x + (targetPoint.x - tower.x) * travel, y = tower.y + (targetPoint.y - tower.y) * travel, projectileColor = projectile.overdrive ? '#e9ff67' : projectile.crit ? '#ff92eb' : '#e6f4ff'; context.save(); context.translate(x,y); context.shadowColor=projectileColor; context.shadowBlur=12; context.fillStyle=projectileColor; if(projectile.crit) { polygon(0,0,6,4,Math.PI/4,0,projectile.targetId); context.fill(); } else { context.beginPath(); context.arc(0,0,projectile.overdrive?5:3.5,0,Math.PI*2); context.fill(); } context.restore(); }
+  for (const creep of player.creeps) { const point = points.get(creep.id); const hp = Math.max(0, creep.hp / creep.maxHp), radius=(creep.form?.includes('abomination')?18:creep.form?.includes('chimera')?12:creep.form==='fragment'?4:creep.form==='shard'?5:creep.form==='brood'?5:7)+(creep.boss?3:0); if (creep.slowUntil > snapshotTime) { context.strokeStyle = '#6ce5ff'; context.lineWidth = 2; context.shadowColor='#6ce5ff'; context.shadowBlur=8; context.beginPath(); context.arc(point.x, point.y + 5, radius+3, 0, Math.PI * 2); context.stroke(); context.shadowBlur=0; } if (creep.safeToken && creep.safeUntil > snapshotTime) { context.strokeStyle='#f7dc6f'; context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,radius+6,0,Math.PI*2); context.stroke(); } if (creep.chrysalisUntil > snapshotTime) { context.fillStyle='#c891ff77'; context.beginPath(); context.ellipse(point.x,point.y,radius+4,radius+8,0,0,Math.PI*2); context.fill(); } if (creep.burn) { context.fillStyle = '#ff8e46'; context.shadowColor='#ff5d3e'; context.shadowBlur=9; context.beginPath(); context.arc(point.x + radius*.7, point.y - radius, 3 + Math.sin(snapshotTime * 16 + creep.id), 0, Math.PI * 2); context.fill(); context.shadowBlur=0; } const baseColor = creep.boss?'#f3ad4f':creep.form?.includes('abomination')?'#b94c75':creep.form?.includes('chimera')?'#c47dff':creep.form==='fragment'?'#8bf2db':creepColor(creep, player); drawKethra(creep, point, radius, baseColor); context.fillStyle = '#081120'; context.fillRect(point.x - radius-1, point.y - radius - 9, (radius+1)*2, 3); context.fillStyle = hp > .35 ? '#77e6a0' : '#ff8a6d'; context.fillRect(point.x - radius-1, point.y - radius - 9, (radius+1)*2 * hp, 3); }
+  for (const projectile of player.projectiles) {
+    const target = points.get(projectile.targetId);
+    const origin = motion.originFor(projectile.firedAt);
+    if (origin && target) drawRound(projectile, origin, target);
+  }
+}
+
+function drawRound(round, origin, target) {
+  const travel = Math.max(0, Math.min(1, (snapshotTime - round.firedAt) / (round.impactAt - round.firedAt)));
+  const dx = target.x - origin.x, dy = target.y - origin.y;
+  const color = round.overdrive ? '#e9ff67' : round.crit ? '#ff92eb' : '#ffeab4';
+  context.save();
+  context.translate(origin.x + dx * travel, origin.y + dy * travel);
+  context.rotate(Math.atan2(dy, dx));
+  const tail = Math.min(18, Math.hypot(dx, dy) * travel);
+  if (tail > 0) {
+    const trail = context.createLinearGradient(-tail, 0, 0, 0);
+    trail.addColorStop(0, `${color}00`);
+    trail.addColorStop(1, color);
+    context.strokeStyle = trail;
+    context.lineWidth = round.crit || round.overdrive ? 3 : 2;
+    context.beginPath();
+    context.moveTo(-tail, 0);
+    context.lineTo(0, 0);
+    context.stroke();
+  }
+  context.shadowBlur = 7;
+  context.shadowColor = color;
+  context.fillStyle = color;
+  context.beginPath();
+  context.ellipse(0, 0, round.crit ? 5 : 3.5, round.crit ? 2.5 : 1.8, 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
 }
 function drawCritFloats(snapshot) {
   for (const float of snapshot.critFloats) {
@@ -194,6 +231,8 @@ function render(snapshot) {
 }
 function frame(now) { if (running) { const elapsed = previous ? (now - previous) / 1000 : 0; match.step(elapsed); const snapshot = match.snapshot(); if (snapshot.result) running = false; render(snapshot); } previous = now; requestAnimationFrame(frame); }
 const arenaArt = createArenaArt(context, canvas, routePoint);
+const turrets = { human:createTurretMotion(), bot:createTurretMotion() };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const upgradePanel = createUpgradePanel({
   panel: document.querySelector('#upgrade-panel'),
   sheet: document.querySelector('#upgrade-sheet'),

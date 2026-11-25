@@ -121,6 +121,42 @@ async function scenario(base, mobile, offline = false) {
   }
 }
 
+async function verifyTurretArt(base) {
+  const page = await browser.newPage({ viewport: { width:1440, height:1000 } });
+  try {
+    await page.addInitScript(() => {
+      window.muzzleFlashes = [];
+      const original = CanvasRenderingContext2D.prototype.createRadialGradient;
+      CanvasRenderingContext2D.prototype.createRadialGradient = function (...args) {
+        if (this.canvas.id === 'arena' && args.slice(0,5).every(value => value === 0) && args[5] > 12 && args[5] <= 20) {
+          const aim = this.getTransform();
+          window.muzzleFlashes.push({ x:aim.e, y:aim.f, angle:Math.atan2(aim.b,aim.a) });
+        }
+        return original.apply(this, args);
+      };
+    });
+    await page.clock.install();
+    await page.goto(base);
+    await page.locator('#start').click();
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(now + 500);
+    await page.clock.runFor(20_000);
+    let flashes = await page.evaluate(() => window.muzzleFlashes);
+    for (let step = 0; !flashes.length && step < 120; step++) {
+      await page.clock.runFor(25);
+      flashes = await page.evaluate(() => window.muzzleFlashes);
+    }
+    assert.ok(flashes.length, 'the real match must draw its first muzzle flash');
+    const flash = flashes[0];
+    assert.ok(Math.abs(flash.x - 210) > 3, 'the cannon must turn off its idle bearing on the first shot');
+    assert.ok(flash.y < 575 && Math.sin(flash.angle) < 0, 'the muzzle points toward the actual firing sector');
+    await capture(page, 'turret-firing');
+    console.log('PASS: the running browser rendered a muzzle flash from the rotated cannon.');
+  } finally {
+    await page.close();
+  }
+}
+
 try {
   const base = await serverUrl();
   if (output) await mkdir(output, { recursive:true });
@@ -129,6 +165,7 @@ try {
   browser = await chromium.launch({ executablePath: process.env.KETHRA_BROWSER || undefined });
   await scenario(base, false);
   await scenario(base, true);
+  await verifyTurretArt(base);
   if (process.env.KETHRA_PREVIEW_FILE) await scenario(pathToFileURL(resolve(process.env.KETHRA_PREVIEW_FILE)).href, false, true);
 } finally {
   await browser?.close();

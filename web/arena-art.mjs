@@ -127,31 +127,123 @@ export function createArenaArt(ctx, canvas, routePoint) {
     ctx.restore();
   }
 
-  function drawTower(tower, time, color, label) {
+  function plate(points, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(...points[0]);
+    for (const point of points.slice(1)) ctx.lineTo(...point);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  }
+
+  function drawTower(tower, color, label, pose) {
     ctx.save();
     ctx.translate(tower.x, tower.y);
-    ctx.fillStyle = '#080c09';
-    ctx.beginPath(); ctx.ellipse(4, 12, 47, 32, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#060a079c';
     ctx.beginPath();
-    ctx.moveTo(-45, 10); ctx.lineTo(-28, -18); ctx.lineTo(28, -18);
-    ctx.lineTo(45, 10); ctx.lineTo(29, 27); ctx.lineTo(-29, 27); ctx.closePath();
-    ctx.fillStyle = '#363b32'; ctx.fill(); ctx.strokeStyle = '#848879'; ctx.stroke();
-    for (const sign of [-1, 1]) {
-      ctx.save(); ctx.scale(sign, 1);
-      ctx.fillStyle = '#242a24'; ctx.fillRect(15, -31, 18, 44);
-      ctx.fillStyle = '#737b67'; ctx.fillRect(16, -31, 5, 37);
-      ctx.fillStyle = color; ctx.fillRect(18, -36, 10, 4); ctx.fillRect(22, 4, 8, 2);
+    ctx.ellipse(4, 12, 52, 32, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const outline = [[-48,7],[-34,-21],[-22,-29],[22,-29],[34,-21],[48,7],[36,24],[-36,24]];
+    const plating = ctx.createLinearGradient(0, -29, 0, 24);
+    plating.addColorStop(0, '#60695a');
+    plating.addColorStop(.42, '#343e35');
+    plating.addColorStop(1, '#202922');
+    plate(outline.map(([x,y]) => [x,y+6]), '#121813', '#555e50');
+    plate(outline, plating, '#929988');
+
+    for (const direction of [-1, 1]) {
+      ctx.save();
+      ctx.scale(direction, 1);
+      plate([[22,-22],[32,-16],[43,7],[35,18],[26,18],[30,7]], '#252f27', '#536253');
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = '#111914';
+        ctx.fillRect(30 + i * 2, 1 + i * 3, 5, 1);
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(32, 13, 4, 1.5);
       ctx.restore();
     }
-    ctx.beginPath(); ctx.moveTo(0, -39); ctx.lineTo(18, -11);
-    ctx.lineTo(18, 6); ctx.lineTo(0, 16); ctx.lineTo(-18, 6); ctx.lineTo(-18, -11); ctx.closePath();
-    ctx.fillStyle = '#141b16'; ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.stroke();
-    ctx.shadowColor = color; ctx.shadowBlur = 10 + Math.sin(time * 3) * 3;
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(pose.pivot.x, pose.pivot.y);
+    ctx.fillStyle = '#172019';
+    ctx.strokeStyle = '#8c9782';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = `${color}60`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.rotate(pose.angle);
+    plate([[-18,-10],[-8,-15],[14,-13],[24,-6],[24,6],[14,13],[-8,15],[-18,10]], '#4e5c4c', '#a3ad97');
+    plate([[-14,-7],[-5,-11],[12,-9],[18,-4],[18,4],[12,9],[-5,11],[-14,7]], '#29382d', '#626f5f');
+
+    ctx.translate(-pose.recoil, 0);
+    const steel = ctx.createLinearGradient(0, -7, 0, 7);
+    steel.addColorStop(0, '#a9b4a2');
+    steel.addColorStop(.35, '#697965');
+    steel.addColorStop(.58, '#455646');
+    steel.addColorStop(1, '#24322a');
+    plate([[2,-7],[21,-7],[23,-5],[42,-4],[42,4],[23,5],[21,7],[2,7]], steel, '#adbaaa');
+    plate([[40,-6],[46,-6],[49,-4],[49,4],[46,6],[40,6]], '#202c24', '#9aa793');
+    ctx.fillStyle = '#121a15';
+    ctx.fillRect(46, -2, 3, 4);
     ctx.fillStyle = color;
-    ctx.beginPath(); ctx.moveTo(0, -29); ctx.lineTo(7, -9); ctx.lineTo(0, 4); ctx.lineTo(-7, -9); ctx.closePath(); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#f7e8c5'; ctx.font = '700 9px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText(label, 0, 44);
+    ctx.fillRect(9, -.85, 13, 1.7);
+    ctx.restore();
+
+    if (pose.effect) drawMuzzleEffect(pose.effect, color);
+
+    ctx.save();
+    ctx.fillStyle = '#f7e8c5';
+    ctx.font = '700 9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, tower.x, tower.y + 44);
+    ctx.restore();
+  }
+
+  function drawMuzzleEffect({ muzzle, angle, flash, sparkAge, hotShot }, color) {
+    ctx.save();
+    ctx.translate(muzzle.x, muzzle.y);
+    ctx.rotate(angle);
+    const glow = hotShot ? '#e9ff67' : color;
+    if (flash > 0) {
+      const radius = 12 + 8 * flash;
+      const light = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      light.addColorStop(0, '#fff6c5');
+      light.addColorStop(.24, glow);
+      light.addColorStop(1, `${glow}00`);
+      ctx.globalAlpha = flash * .65;
+      ctx.fillStyle = light;
+      ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+      ctx.globalAlpha = flash;
+      plate([[-3,0],[1,-6],[5,-2],[13+7*flash,0],[5,2],[1,6]], '#fff6c8');
+    }
+    if (sparkAge !== null) {
+      ctx.globalAlpha = .8 * (1 - sparkAge / .19);
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.2;
+      for (const spread of [-.55, -.19, .27, .64]) {
+        const distance = 8 + sparkAge * (100 + 40 * Math.abs(spread));
+        const y = distance * spread;
+        ctx.beginPath();
+        ctx.moveTo(distance - 4, y * .82);
+        ctx.lineTo(distance, y);
+        ctx.stroke();
+      }
+    }
     ctx.restore();
   }
 
