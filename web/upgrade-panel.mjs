@@ -1,10 +1,13 @@
 import { UPGRADE_GROUPS, TIER2_FAMILIES, TIER3_FAMILIES, TIER1_MAX_LEVEL, TIER2_MAX_LEVEL } from '../dist/live.mjs';
 import { upgradeCost, upgradeBlock } from './upgrade-state.mjs';
+import { BASIC_UPGRADES, GROUP_COPY, UPGRADE_EFFECTS } from './upgrade-copy.mjs';
 
-export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons, purchase }) {
+export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const mobile = matchMedia('(max-width: 760px)');
   const families = panel.querySelector('[data-families]');
   const specializations = panel.querySelector('[data-specializations]');
+  const paths = panel.querySelector('.upgrade-paths');
+  const baseOffer = panel.querySelector('[data-base-offer]');
   const details = panel.querySelector('[data-upgrade-details]');
   const feedback = panel.querySelector('[data-upgrade-feedback]');
   const confirmation = panel.querySelector('[data-confirmation]');
@@ -15,14 +18,14 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
   let groupIndex = 0;
   let root = UPGRADE_GROUPS[0].nodes[0][0];
   let choice = null;
-  let snapshot, running, structure, pending;
+  let snapshot, running, basicSelection, pathSelection, pending;
   try { confirmPreference.checked = localStorage.getItem('td-confirm-purchases') !== 'false'; } catch {}
   confirmPreference.addEventListener('change', () => {
     try { localStorage.setItem('td-confirm-purchases', String(confirmPreference.checked)); } catch {}
   });
 
   const group = () => UPGRADE_GROUPS[groupIndex];
-  const rootLabel = () => group().nodes.find(([id]) => id === root)[1];
+  const rootLabel = () => BASIC_UPGRADES[root].name;
   const state = () => snapshot.players.human;
   const rootRank = id => (id in state().tower ? state().tower : state().mutations)[id];
 
@@ -57,20 +60,26 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
     confirmText.textContent = '';
   }
 
-  function makeOffer(offer, copy) {
+  function makeOffer(offer, effect, numbers) {
+    const type = offer.tier === 3 ? 'Ultimate' : '';
+    const timing = offer.kind === 'active' || offer.id === 'overdrive' ? 'Active' : '';
+    const math = numbers && numbers !== effect ? `<details class="upgrade-numbers"><summary>Details</summary><p>${numbers}</p></details>` : '';
     return `<article class="upgrade-offer" data-offer="${offer.tier}">
-      <div><h3>${offer.label}</h3><p>${copy}</p></div>
+      <div class="offer-heading"><h3>${offer.label}</h3><span>${[type, timing].filter(Boolean).join(' · ')}</span></div>
+      <p>${effect}</p>
+      ${math}
       <button type="button" data-buy="${offer.tier}" aria-describedby="offer-status-${offer.tier}"></button>
       <span id="offer-status-${offer.tier}" class="offer-status"></span>
     </article>`;
   }
 
-  function rebuild(available) {
+  function rebuildBasics(offer) {
     groupButtons.forEach((button, index) => button.setAttribute('aria-pressed', String(index === groupIndex)));
-    families.innerHTML = group().nodes.map(([id, label]) => `<button type="button" data-family="${id}" aria-pressed="${id === root}"><span aria-hidden="true">${icons[id]}</span> ${label}<small></small></button>`).join('');
-    specializations.innerHTML = TIER2_FAMILIES[root].map(item => `<button type="button" data-specialization="${item.id}" aria-pressed="${item.id === choice}">${item.label}<small></small></button>`).join('');
-    details.innerHTML = makeOffer(available[0], descriptions[root].join(' '))
-      + (choice ? makeOffer(available[1], available[1].detail) + makeOffer(available[2], available[2].detail) : '');
+    text(panel.querySelector('[data-group-hint]'), GROUP_COPY[groupIndex]);
+    families.innerHTML = group().nodes.map(([id]) => `<button type="button" data-family="${id}" aria-pressed="${id === root}">${BASIC_UPGRADES[id].name}<small></small></button>`).join('');
+    specializations.innerHTML = TIER2_FAMILIES[root].map(item => `<button type="button" data-specialization="${item.id}">${item.label}<small></small></button>`).join('');
+    const basic = BASIC_UPGRADES[root];
+    baseOffer.innerHTML = makeOffer(offer, basic.effect, basic.details);
   }
 
   function text(element, copy) {
@@ -81,21 +90,35 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
     snapshot = nextSnapshot;
     running = active;
     const available = offers();
-    const selection = [groupIndex, root, choice].join('/');
-    if (selection !== structure) {
-      structure = selection;
-      rebuild(available);
+    if (basicSelection !== root) {
+      basicSelection = root;
+      rebuildBasics(available[0]);
+    }
+    if (pathSelection !== `${root}/${choice}`) {
+      pathSelection = `${root}/${choice}`;
+      for (const button of specializations.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.specialization === choice));
+      details.innerHTML = available.slice(1).map(offer => makeOffer(offer, UPGRADE_EFFECTS[offer.id], offer.detail)).join('');
     }
     text(panel.querySelector('[data-panel-flux]'), `${Math.floor(state().energy)} Flux`);
-    text(panel.querySelector('[data-tier2-hint]'), rootRank(root) ? `${rootLabel()} specializations` : `Requires ${rootLabel()} rank 1`);
-    for (const button of families.querySelectorAll('button')) text(button.lastElementChild, `${rootRank(button.dataset.family)} / ${TIER1_MAX_LEVEL}`);
-    for (const button of specializations.querySelectorAll('button')) text(button.lastElementChild, `${state().tier2[root][button.dataset.specialization]} / ${TIER2_MAX_LEVEL}`);
+    const unlocked = rootRank(root) > 0;
+    paths.toggleAttribute('data-unlocked', unlocked);
+    text(panel.querySelector('[data-tier2-hint]'), unlocked ? 'Choose a path' : `Unlock with ${rootLabel()} rank 1`);
+    for (const button of families.querySelectorAll('button')) {
+      const rank = rootRank(button.dataset.family);
+      text(button.lastElementChild, rank ? `Rank ${rank} / ${TIER1_MAX_LEVEL}` : 'Not unlocked');
+    }
+    for (const button of specializations.querySelectorAll('button')) {
+      const rank = state().tier2[root][button.dataset.specialization];
+      text(button.lastElementChild, rank ? `Rank ${rank} / ${TIER2_MAX_LEVEL}` : 'Not unlocked');
+    }
     for (const offer of available) {
-      const button = details.querySelector(`[data-buy="${offer.tier}"]`);
+      const button = panel.querySelector(`[data-buy="${offer.tier}"]`);
       const reason = block(offer);
+      const verb = offer.level ? 'Upgrade' : 'Unlock';
+      const action = offer.tier === 3 ? 'Unlock Ultimate' : `${verb} ${offer.label}`;
       button.disabled = Boolean(reason);
-      text(button, offer.level >= offer.max ? (offer.tier === 3 ? 'Acquired' : 'Max rank') : `Buy ${offer.label} · ${priceLabel(offer)}`);
-      text(details.querySelector(`#offer-status-${offer.tier}`), reason || `Rank ${offer.level} / ${offer.max}`);
+      text(button, offer.level >= offer.max ? (offer.tier === 3 ? 'Acquired' : 'Max rank') : `${action} · ${priceLabel(offer)}`);
+      text(panel.querySelector(`#offer-status-${offer.tier}`), reason || (offer.level ? `Rank ${offer.level} / ${offer.max}` : ''));
     }
     if (pending) {
       const offer = available.find(item => item.tier === pending.tier && item.id === pending.id);
@@ -112,8 +135,15 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
   function finish(offer) {
     const reason = block(offer);
     clearConfirmation();
-    setFeedback(reason || purchase(offer.tier, root, offer.id));
-    const button = details.querySelector(`[data-buy="${offer.tier}"]`);
+    if (reason) {
+      setFeedback(reason);
+      return;
+    }
+    const price = priceLabel(offer);
+    const error = purchase(offer.tier, root, offer.id);
+    const rank = offers().find(item => item.tier === offer.tier).level;
+    setFeedback(rank === offer.level ? error : `${offer.label} ${offer.level ? `upgraded to rank ${rank}` : 'unlocked'} · ${price}`);
+    const button = panel.querySelector(`[data-buy="${offer.tier}"]`);
     (button.disabled ? panel.querySelector('[data-upgrade-heading]') : button).focus({ preventScroll: true });
   }
 
@@ -124,7 +154,7 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
     if (button.hasAttribute('data-cancel-upgrade')) {
       const offer = pending;
       clearConfirmation();
-      if (offer) details.querySelector(`[data-buy="${offer.tier}"]`)?.focus({ preventScroll: true });
+      if (offer) panel.querySelector(`[data-buy="${offer.tier}"]`)?.focus({ preventScroll: true });
       return;
     }
     if (button.hasAttribute('data-confirm-upgrade')) {
@@ -146,6 +176,7 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
     }
     const { group: index, family, specialization } = button.dataset;
     if (index === undefined && !family && !specialization) return;
+    if (Number(index) === groupIndex || family === root || specialization === choice) return;
     clearConfirmation();
     setFeedback('');
     if (index !== undefined) {
@@ -156,6 +187,7 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
       root = family;
       choice = null;
     } else choice = specialization;
+    if (index !== undefined || family) paths.open = false;
     refresh(snapshot, running);
     if (family) families.querySelector(`[data-family="${family}"]`).focus({ preventScroll: true });
     if (specialization) specializations.querySelector(`[data-specialization="${specialization}"]`).focus({ preventScroll: true });
@@ -182,6 +214,7 @@ export function createUpgradePanel({ panel, sheet, desktop, descriptions, icons,
     groupIndex = 0;
     root = UPGRADE_GROUPS[0].nodes[0][0];
     choice = null;
+    paths.open = false;
   }
 
   sheet.addEventListener('close', clearConfirmation);

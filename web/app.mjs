@@ -19,50 +19,186 @@ const mapNav = document.querySelector('#map-nav');
 const swipeMap = document.querySelector('#swipe-map');
 const actionDock = document.querySelector('#action-dock');
 const portraitMap = document.querySelector('#portrait-map');
+const portraitTempo = document.querySelector('#portrait-tempo');
+const fieldTip = document.querySelector('#field-tip');
+const aimCancel = document.querySelector('#cancel-aim');
+const arenaWrap = canvas.parentElement;
+const strainMeter = document.querySelector('#strain-meter');
+const waveTimer = document.querySelector('#incursion-next');
+const waveLabel = document.querySelector('#portrait-wave');
+const nextWaveLabel = document.querySelector('#next-wave-label');
+const fluxLabel = document.querySelector('#portrait-flux');
+const strainLabel = document.querySelector('#overload');
 const createMatch = () => new LiveMatch(undefined, mode.value === 'solo' ? { botEnabled: false, soloProgression: true } : { botProfile:botProfile.value });
 let match = createMatch();
 let running = false;
+let paused = false;
 let previous = 0;
 let mapView = 'human';
 let swipeStart = null;
-let pendingUltimateTarget = null;
-const NODE_ICONS = Object.freeze({ damage:'◉', attackSpeed:'≋', crit:'⌖', armor:'⬡', speed:'↟', maxHp:'◍', interest:'◌', rewardFloor:'▣', overdrive:'⚡' });
-const NODE_INFO = Object.freeze({
-  damage: ['Raises innate Round damage by 5% per rank, up to +45%.', 'Every permanent upgrade across all branches also adds 1 damage. Fortress output shows the current combined range; hit-specific effects apply afterwards.'],
-  attackSpeed: ['Raises the fortress firing rate from 1.00 to 1.60 rounds per second.', 'Cadence is the permanent firing-rate layer. Combat Rhythm and temporary effects then multiply this live value; the Output panel always shows the current result.'],
-  crit: ['Builds the base critical chance from 0% to 30%.', 'Precision sets the basic chance for a Round to become critical. Tier II can add chance or improve its multiplier, so the live critical total is shown separately.'],
-  armor: ['Gradually raises the armor inherited by every spawned Kethra.', 'Carapace is applied at spawning. Its nine ranks lead to the current approved maximum rather than creating a stronger end state.'],
-  speed: ['Gradually raises the movement speed inherited by every spawned Kethra.', 'Kinesis affects future spawns. Its later specializations add temporary movement behaviour on top of the inherited base speed.'],
-  maxHp: ['Gradually raises the health inherited by every spawned Kethra.', 'Vital Mass affects future spawns. It is the persistent health layer; Tier II can add healing, distribution, or evolution behaviours.'],
-  interest: ['Raises the interest rate paid every six seconds.', 'Reserves compounds only Flux kept available. The economy panel shows the exact active rate and an estimate of the next tick, including relevant economic effects.'],
-  rewardFloor: ['Raises the minimum Flux value of a Kethra after repeated laps.', 'Control Nexus protects late-lap rewards from dropping too low. It does not change the first-lap reward; its exact effect is reflected in the next kill reward.'],
-  overdrive: ['Builds Surge Core from an initial multi-round burst to its approved full output.', 'Each rank improves the four-second Surge Core window. It remains an active ability with a long cooldown, not permanent free firing speed.']
-});
+let aim = null;
+let trackPosition = .5;
+let trackMarkerVisible = false;
+let statusExpiry;
+const ultimateLabels = Object.fromEntries(Object.values(TIER3_FAMILIES).flat().map(({ id, label }) => [id, label]));
 
-function setMapView(view, snapshot = latestSnapshot ?? match.snapshot()) { if (view === 'bot' && mode.value === 'solo') return; mapView = view; render(snapshot); }
-function setModeUi() { const solo = mode.value === 'solo'; botProfileLabel.hidden = solo; subtitle.textContent = solo ? 'Solo progression — clear Wave 60' : `You versus ${BOT_PROFILES[botProfile.value].label} bot`; mapNav.hidden = solo; if (solo) mapView = 'human'; }
+function setText(element, copy) {
+  if (element.textContent !== copy) element.textContent = copy;
+}
+
+function showStatus(message) {
+  clearTimeout(statusExpiry);
+  status.hidden = !message;
+  setText(status, message);
+  if (message) statusExpiry = setTimeout(() => showStatus(''), 5000);
+}
+
+function setMapView(view, snapshot = latestSnapshot ?? match.snapshot()) {
+  if (view === 'bot' && mode.value === 'solo') return;
+  if (view !== mapView) aim = null;
+  mapView = view;
+  render(snapshot);
+}
+
+function setModeUi() {
+  const solo = mode.value === 'solo';
+  botProfileLabel.hidden = solo;
+  subtitle.textContent = solo ? 'Solo · Defend your fortress' : `Versus bot · ${BOT_PROFILES[botProfile.value].label}`;
+  mapNav.hidden = solo;
+  if (solo) mapView = 'human';
+}
+
 function resetMatch(active = false) {
   match = createMatch();
   running = active;
-  start.disabled = active;
-  pendingUltimateTarget = null;
+  paused = false;
+  previous = 0;
+  aim = null;
   swipeStart = null;
   mapView = 'human';
+  showStatus('');
   upgradePanel.reset();
   for (const motion of Object.values(turrets)) motion.reset();
   render(match.snapshot());
 }
 mode.addEventListener('change', () => { setModeUi(); resetMatch(); });
 botProfile.addEventListener('change', () => { if (mode.value === 'versus') { setModeUi(); resetMatch(); } });
-start.addEventListener('click', () => { running = true; start.disabled = true; render(match.snapshot()); });
-restart.addEventListener('click', () => resetMatch(true));
-document.querySelector('#portrait-tempo').addEventListener('click', () => { if (!running) return; match.activateTempoCharge(); render(match.snapshot()); });
+start.addEventListener('click', () => {
+  if (latestSnapshot.result) {
+    resetMatch(true);
+    return;
+  }
+  paused = running && !paused;
+  running = true;
+  if (paused) aim = null;
+  showStatus('');
+  render(match.snapshot());
+});
+restart.addEventListener('click', () => {
+  restart.closest('details').open = false;
+  resetMatch(true);
+  start.focus();
+});
+portraitTempo.addEventListener('click', () => {
+  if (!running || paused) return;
+  match.activateTempoCharge();
+  showStatus(match.snapshot().message);
+  render(match.snapshot());
+});
 portraitMap.addEventListener('click', () => setMapView(mapView === 'human' ? 'bot' : 'human'));
-canvas.addEventListener('pointerdown', (event) => { swipeStart = { x:event.clientX, y:event.clientY }; });
-canvas.addEventListener('pointerup', (event) => { if (!swipeStart) return; const dx = event.clientX - swipeStart.x, dy = event.clientY - swipeStart.y; const rect = canvas.getBoundingClientRect(), x = (event.clientX - rect.left) * canvas.width / rect.width, y = (event.clientY - rect.top) * canvas.height / rect.height; swipeStart = null; if (swipeMap.checked && mode.value === 'versus' && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) { setMapView(dx < 0 ? 'bot' : 'human'); return; } if (mapView === 'human' && pendingUltimateTarget) { const player = (latestSnapshot ?? match.snapshot()).players.human; const nearest = player.creeps.map((creep) => ({ creep, point:formationPoint(creep.progress, 'human', creep.id) })).sort((a,b) => Math.hypot(a.point.x-x,a.point.y-y)-Math.hypot(b.point.x-x,b.point.y-y))[0]; match.activateUltimate(pendingUltimateTarget, nearest?.creep.progress ?? .5); pendingUltimateTarget = null; render(match.snapshot()); return; } if (mapView === 'human' && (latestSnapshot ?? match.snapshot()).players.human.priorityMode === 'manual') { const player = (latestSnapshot ?? match.snapshot()).players.human; const nearest = player.creeps.map((creep) => ({ creep, point:formationPoint(creep.progress, 'human', creep.id) })).sort((a,b) => Math.hypot(a.point.x-x,a.point.y-y)-Math.hypot(b.point.x-x,b.point.y-y))[0]; if (nearest && Math.hypot(nearest.point.x-x,nearest.point.y-y) < 24) { match.setManualTarget(nearest.creep.id); render(match.snapshot()); return; } } if (mapView === 'human' && Math.hypot(dx, dy) < 12 && Math.hypot(x - FORTRESS.x, y - FORTRESS.y) < 58) upgradePanel.open(); });
+
+function canvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+}
+
+function aimAt(point) {
+  let distance = Infinity;
+  for (let step = 0; step <= 200; step++) {
+    const progress = step / 200;
+    const sample = routePoint(progress);
+    const nextDistance = Math.hypot(sample.x - point.x, sample.y - point.y);
+    if (nextDistance < distance) {
+      distance = nextDistance;
+      trackPosition = progress;
+    }
+  }
+  trackMarkerVisible = distance <= 28;
+}
+
+function finishAim(cast) {
+  if (!aim) return;
+  const id = aim;
+  aim = null;
+  if (cast) {
+    match.activateUltimate(id, trackPosition);
+    showStatus(match.snapshot().message);
+  } else showStatus('');
+  render(match.snapshot());
+  const button = actionDock.querySelector(`[data-aim-ultimate="${id}"]`);
+  (button?.disabled ? start : button)?.focus({ preventScroll: true });
+}
+
+aimCancel.addEventListener('click', () => finishAim(false));
+document.addEventListener('keydown', event => {
+  if (aim && event.key === 'Escape') {
+    event.preventDefault();
+    finishAim(false);
+  }
+});
+canvas.addEventListener('keydown', event => {
+  if (!aim) return;
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    if (trackMarkerVisible) finishAim(true);
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    trackPosition = Math.max(0, Math.min(1, trackPosition + (event.key === 'ArrowLeft' ? -.02 : .02)));
+    trackMarkerVisible = true;
+    render(latestSnapshot);
+  }
+});
+canvas.addEventListener('pointerdown', event => {
+  if (event.isPrimary && event.button === 0) swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
+});
+canvas.addEventListener('pointermove', event => {
+  if (aim && event.pointerType === 'mouse') aimAt(canvasPoint(event));
+});
+canvas.addEventListener('pointerup', event => {
+  if (swipeStart?.id !== event.pointerId) return;
+  const dx = event.clientX - swipeStart.x;
+  const dy = event.clientY - swipeStart.y;
+  swipeStart = null;
+  if (swipeMap.checked && mode.value === 'versus' && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    setMapView(dx < 0 ? 'bot' : 'human');
+    return;
+  }
+  if (mapView !== 'human' || Math.hypot(dx, dy) >= 12) return;
+  const point = canvasPoint(event);
+  if (aim) {
+    aimAt(point);
+    if (trackMarkerVisible) finishAim(true);
+    else showStatus('Choose a point on the track.');
+    return;
+  }
+  const player = latestSnapshot.players.human;
+  if (running && !paused && player.priorityMode === 'manual') {
+    const nearest = player.creeps.map(creep => {
+      const position = formationPoint(creep.progress, 'human', creep.id);
+      return { creep, distance: Math.hypot(position.x - point.x, position.y - point.y) };
+    }).sort((a, b) => a.distance - b.distance)[0];
+    if (nearest && nearest.distance < 24) {
+      match.setManualTarget(nearest.creep.id);
+      showStatus('Target selected.');
+      render(match.snapshot());
+      return;
+    }
+  }
+  if (Math.hypot(point.x - FORTRESS.x, point.y - FORTRESS.y) < 58) openUpgrades();
+});
 canvas.addEventListener('pointercancel', () => { swipeStart = null; });
 
-function routePoint(progress, side) {
+function routePoint(progress) {
   if (progress <= .3) return { x:68, y:626 - progress / .3 * 408 };
   if (progress <= .7) { const angle = Math.PI * (1 - (progress - .3) / .4); return { x:210 + 142 * Math.cos(angle), y:218 - 112 * Math.sin(angle) }; }
   return { x:352, y:218 + (progress - .7) / .3 * 408 };
@@ -190,46 +326,176 @@ function drawFogOverlay(reconLevel, opponent) {
   context.fillText(reconLevel ? `Spectral Relay: ${message}` : message, 210, 362);
   context.fillText(reconLevel ? `Upgrade to rank ${TIER2_MAX_LEVEL} for full reconnaissance.` : 'Spectral Relay rank 1 reveals purchases and Core Strain.', 210, 382);
 }
-let actionRenderKey = '';
+const priorities = { default: 'Automatic', veteran: 'Most laps', lowest: 'Lowest health', highest: 'Highest health', manual: 'Pick an enemy' };
+const contracts = { chimera: ['Chimera', 90], abomination: ['Abomination', 180], hp: ['+20% health', 55], armor: ['+2 armor', 55], speed: ['+15% speed', 55] };
+let abilityLayout = '';
+
 function renderActionDock(snapshot) {
-  const player = snapshot.players.human, actions = [], owned = Object.values(player.tier3).flatMap((choices) => Object.entries(choices).filter(([,value]) => value).map(([id]) => id));
-  const key=JSON.stringify([running,player.tower.overdrive,player.tier2.overdrive,owned,player.priorityMode,Math.ceil(player.overdriveCooldown),Object.entries(player.activeCooldowns).map(([k,v])=>[k,Math.ceil(v)]),Object.entries(player.ultimateCooldowns).map(([k,v])=>[k,Math.ceil(v)])]);
-  if(key===actionRenderKey) return; actionRenderKey=key;
-  if (player.tower.overdrive) actions.push(`<button data-action="overdrive" ${!running || player.overdriveCooldown > 0 ? 'disabled' : ''}>Surge Core ${player.overdriveCooldown > 0 ? `${Math.ceil(player.overdriveCooldown)} s` : 'Ready'}</button>`);
-  for (const choice of TIER2_FAMILIES.overdrive) { const level = player.tier2.overdrive[choice.id], cooldown = player.activeCooldowns[choice.id] ?? 0; if (level) actions.push(`<button data-active="${choice.id}" ${!running || cooldown > 0 ? 'disabled' : ''}>${choice.label}${cooldown > 0 ? ` · ${Math.ceil(cooldown)} s` : ''}</button>`); }
-  if (owned.includes('commandOverride')) actions.push(`<div class="action-group"><span>Command Override · ${player.priorityMode}</span><button data-priority="default">Default</button><button data-priority="veteran">Veteran</button><button data-priority="lowest">Lowest HP</button><button data-priority="highest">Highest HP</button><button data-priority="manual">Manual</button></div>`);
-  if (owned.includes('bioforgeProgram')) actions.push(`<div class="action-group"><span>Bioforge Program · next Incursion</span><button data-bioforge="chimera">Chimera · 90</button><button data-bioforge="abomination">Abomination · 180</button><button data-bioforge="hp">+20% HP · 55</button><button data-bioforge="armor">+2 Armor · 55</button><button data-bioforge="speed">+15% Speed · 55</button></div>`);
-  for (const id of ['signalCorruption','nullifyingPurge','orbitalBreach','conjunctionSpheres']) if (owned.includes(id)) { const label=Object.values(TIER3_FAMILIES).flat().find((choice)=>choice.id===id).label, cooldown=player.ultimateCooldowns[id]??0, disabled=!running||cooldown>0; if (id==='nullifyingPurge'||id==='orbitalBreach') actions.push(`<button data-aim-ultimate="${id}" ${disabled?'disabled':''}>${label}${cooldown?` · ${Math.ceil(cooldown)} s`:' · aim on map'}</button>`); else if(id==='conjunctionSpheres') actions.push(`<button data-ultimate="${id}" data-side="left" ${disabled?'disabled':''}>${label}${cooldown?` · ${Math.ceil(cooldown)} s`:' · left zone'}</button><button data-ultimate="${id}" data-side="right" ${disabled?'disabled':''}>Conjunction · right zone</button>`); else actions.push(`<button data-ultimate="${id}" ${disabled?'disabled':''}>${label}${cooldown?` · ${Math.ceil(cooldown)} s`:''}</button>`); }
-  actionDock.innerHTML = `<h2>Active abilities</h2>${actions.length ? actions.join('') : '<p class="muted">Unlock Surge Core or an active Ultimate.</p>'}`;
+  const player = snapshot.players.human;
+  const active = running && !paused;
+  const owned = new Set(Object.values(player.tier3).flatMap(choices => Object.keys(choices).filter(id => choices[id])));
+  const quick = [];
+
+  function ability(attribute, id, name, remaining, ready = 'Ready', side = '') {
+    quick.push({ attribute, id, name, remaining, ready, side });
+  }
+
+  if (player.tower.overdrive) ability('action', 'overdrive', 'Surge Core', player.overdriveCooldown);
+  for (const choice of TIER2_FAMILIES.overdrive) {
+    if (player.tier2.overdrive[choice.id]) ability('active', choice.id, choice.label, player.activeCooldowns[choice.id]);
+  }
+  for (const id of ['signalCorruption', 'nullifyingPurge', 'orbitalBreach', 'conjunctionSpheres']) {
+    if (!owned.has(id)) continue;
+    const label = ultimateLabels[id];
+    const remaining = player.ultimateCooldowns[id];
+    if (id === 'nullifyingPurge' || id === 'orbitalBreach') ability('aim-ultimate', id, label, remaining, 'Aim on track');
+    else if (id === 'conjunctionSpheres') {
+      ability('ultimate', id, 'Conjunction · Left', remaining, 'Ready', 'left');
+      ability('ultimate', id, 'Conjunction · Right', remaining, 'Ready', 'right');
+    } else ability('ultimate', id, label, remaining);
+  }
+
+  const targeting = owned.has('commandOverride');
+  const bioforge = owned.has('bioforgeProgram');
+  const layout = JSON.stringify([quick.map(item => item.id), targeting, bioforge]);
+  if (layout !== abilityLayout) {
+    abilityLayout = layout;
+    actionDock.hidden = !(quick.length || targeting || bioforge);
+    actionDock.innerHTML = actionDock.hidden ? '' : `<h2>Abilities</h2><div class="quick-abilities">${quick.map(item =>
+      `<button type="button" data-${item.attribute}="${item.id}"${item.side ? ` data-side="${item.side}"` : ''}><span>${item.name}</span><small></small></button>`).join('')}</div>
+      ${targeting ? `<div class="action-group"><h3>Target priority</h3><div>${Object.entries(priorities).map(([id, label]) => `<button type="button" data-priority="${id}">${label}</button>`).join('')}</div></div>` : ''}
+      ${bioforge ? `<div class="action-group"><h3>Bioforge · Next available wave</h3><div>${Object.entries(contracts).map(([id, [label, cost]]) => `<button type="button" data-bioforge="${id}">${label} · ${cost} Flux</button>`).join('')}</div></div>` : ''}`;
+  }
+  actionDock.querySelectorAll('.quick-abilities button').forEach((button, index) => {
+    const item = quick[index];
+    const ready = item.remaining <= 0;
+    button.disabled = !active || !ready;
+    button.classList.toggle('ability-ready', active && ready);
+    if (item.attribute === 'aim-ultimate') button.setAttribute('aria-pressed', String(aim === item.id));
+    const label = !ready ? `Recharging · ${Math.ceil(item.remaining)} s` : paused ? 'Paused' : aim === item.id ? 'Aiming' : item.ready;
+    setText(button.lastElementChild, label);
+  });
+  for (const button of actionDock.querySelectorAll('[data-priority]')) {
+    button.disabled = !active;
+    button.setAttribute('aria-pressed', String(player.priorityMode === button.dataset.priority));
+  }
+  for (const button of actionDock.querySelectorAll('[data-bioforge]')) {
+    button.disabled = !active || player.energy < contracts[button.dataset.bioforge][1];
+  }
 }
-actionDock.addEventListener('click', (event) => { const button = event.target.closest('button'); if (!button || !running) return; if (button.dataset.action === 'overdrive') match.activateOverdrive(); else if (button.dataset.active) match.activateTier2('overdrive', button.dataset.active); else if (button.dataset.priority) match.setPriority(button.dataset.priority); else if (button.dataset.bioforge) match.buyBioforgeContract(button.dataset.bioforge); else if (button.dataset.aimUltimate) { pendingUltimateTarget=button.dataset.aimUltimate; status.textContent=`${button.textContent.split(' · ')[0]}: click a point in your Killzone.`; } else if (button.dataset.ultimate) match.activateUltimate(button.dataset.ultimate,.5,button.dataset.side ?? 'left'); render(match.snapshot()); });
+
+actionDock.addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button || !running || paused) return;
+  const { action, active, priority, bioforge, aimUltimate, ultimate, side } = button.dataset;
+  if (aimUltimate && aim === aimUltimate) return finishAim(false);
+  aim = null;
+  if (action === 'overdrive') match.activateOverdrive();
+  else if (active) match.activateTier2('overdrive', active);
+  else if (priority) match.setPriority(priority);
+  else if (bioforge) match.buyBioforgeContract(bioforge);
+  else if (aimUltimate) {
+    mapView = 'human';
+    aim = aimUltimate;
+    trackPosition = .5;
+    trackMarkerVisible = true;
+    showStatus('');
+    render(match.snapshot());
+    canvas.focus();
+    return;
+  } else if (ultimate) match.activateUltimate(ultimate, .5, side ?? 'left');
+  const snapshot = match.snapshot();
+  showStatus(priority ? `Target priority · ${priorities[priority]}` : snapshot.message);
+  render(snapshot);
+});
+
+function openUpgrades() {
+  if (aim) finishAim(false);
+  upgradePanel.open();
+}
+
+function renderFieldControls(snapshot, opponentView) {
+  const human = snapshot.players.human;
+  setText(start, snapshot.result ? 'Play again' : running ? paused ? 'Resume' : 'Pause' : 'Start match');
+  start.classList.toggle('primary', !running || paused);
+  setText(fluxLabel, String(Math.floor(human.energy)));
+  setText(waveLabel, `Wave ${snapshot.wave} / ${snapshot.maxWaves}${snapshot.wave % 5 === 0 ? ' · Boss' : ''}`);
+  const finalWave = snapshot.wave === snapshot.maxWaves;
+  setText(waveTimer, finalWave ? 'Final wave' : `${Math.ceil(snapshot.nextIncursionIn)}s`);
+  nextWaveLabel.hidden = finalWave;
+  setText(strainLabel, `${human.load} / ${human.overloadCap}`);
+  strainMeter.max = human.overloadCap;
+  strainMeter.value = human.load;
+  strainMeter.classList.toggle('danger', human.load / human.overloadCap >= .75);
+  arenaWrap.classList.toggle('aiming', Boolean(aim));
+  aimCancel.hidden = !aim;
+  if (aim) setText(fieldTip, `${ultimateLabels[aim]}: pick a spot on the track. Arrow keys to aim, Enter to fire.`);
+  else if (paused) setText(fieldTip, 'Paused. You can still buy upgrades.');
+  else if (opponentView) setText(fieldTip, 'Opponent battlefield.');
+  else if (!running) setText(fieldTip, 'Your cannon fires on its own. Spend Flux to upgrade it.');
+  else if (human.priorityMode === 'manual') setText(fieldTip, 'Manual aim: select an enemy on the track.');
+  else setText(fieldTip, '');
+  fieldTip.parentElement.hidden = !fieldTip.textContent;
+
+  portraitTempo.hidden = mode.value !== 'versus' || (!human.tempoCharge && !human.tempoQueued);
+  portraitTempo.disabled = !running || paused || !human.tempoCharge || human.tempoQueued;
+  setText(portraitTempo, human.tempoQueued ? 'Early wave queued' : 'Send next wave early');
+}
+
+function drawAim() {
+  if (!aim || !trackMarkerVisible) return;
+  const point = routePoint(trackPosition);
+  context.save();
+  context.translate(point.x, point.y);
+  context.strokeStyle = '#ffd27d';
+  context.lineWidth = 2;
+  context.shadowColor = '#111827';
+  context.shadowBlur = 6;
+  context.beginPath();
+  context.arc(0, 0, 19, 0, Math.PI * 2);
+  for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    context.moveTo(x * 15, y * 15);
+    context.lineTo(x * 25, y * 25);
+  }
+  context.stroke();
+  context.restore();
+}
+
 let snapshotTime = 0;
 let latestSnapshot = null;
 function render(snapshot) {
   latestSnapshot = snapshot; snapshotTime = snapshot.time; context.clearRect(0, 0, canvas.width, canvas.height); arenaArt.drawBackground();
   const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot' && mode.value === 'versus', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
-  context.fillStyle = '#dcdbbc'; context.font = '600 11px system-ui'; context.textAlign = 'center'; context.fillText(opponentView ? 'Opponent sector' : 'Your firing sector', canvas.width / 2, 79);
   drawSide(viewedPlayer, viewedSide, opponentView ? '#c99ce4' : '#e8bb79', visible); if (opponentView && !visible) drawFogOverlay(reconLevel, bot); if (visible) drawCritFloats(snapshot);
-  document.querySelector('#clock').textContent = `${String(Math.floor(snapshot.time / 60)).padStart(2, '0')}:${String(Math.floor(snapshot.time % 60)).padStart(2, '0')}`;
-  document.querySelector('#incursion').textContent = `${snapshot.wave} / ${snapshot.maxWaves}`;
-  document.querySelector('#incursion-next').textContent = `${snapshot.nextIncursionIn.toFixed(1)} s`;
-  document.querySelector('#energy').textContent = String(human.energy); document.querySelector('#overload').textContent = `${human.load} / ${human.overloadCap}`; document.querySelector('#bot-overload').textContent = `${bot.load} / ${bot.overloadCap}`;
+  drawAim();
+  setText(document.querySelector('#clock'), `${String(Math.floor(snapshot.time / 60)).padStart(2, '0')}:${String(Math.floor(snapshot.time % 60)).padStart(2, '0')}`);
+  setText(document.querySelector('#bot-overload'), `${bot.load} / ${bot.overloadCap}`);
   for (const [id, player] of Object.entries({ human, bot })) { const earned = document.querySelector(`#${id}-earned`), interest = document.querySelector(`#${id}-interest`), avarice = document.querySelector(`#${id}-avarice`), next = document.querySelector(`#${id}-interest-next`); if (earned) earned.textContent = String(player.earnedEnergy); if (interest) interest.textContent = String(player.interestEnergy); if (avarice) avarice.textContent = String(player.avariceEnergy); if (next) next.textContent = `${player.nextInterestIn.toFixed(1)} s · +${Math.floor(player.nextInterestEstimate)}`; }
   document.querySelector('#human-interest-rate').textContent = `${(human.interestRate * 100).toFixed(2)}% / 6s`;
   document.querySelector('#combat-damage').textContent = human.combat.damage.join('–'); document.querySelector('#combat-speed').textContent = `${human.combat.attackRate.toFixed(2)} / s`; document.querySelector('#combat-crit').textContent = `${(human.combat.criticalChance * 100).toFixed(1)}%`; document.querySelector('#combat-multiplier').textContent = typeof human.combat.criticalMultiplier === 'number' ? `${human.combat.criticalMultiplier}×` : human.combat.criticalMultiplier;
   const versus = mode.value === 'versus'; document.querySelectorAll('[data-bot-strain]').forEach((element) => { element.hidden = !versus || reconLevel < 1; }); document.querySelectorAll('[data-bot-economy]').forEach((element) => { element.hidden = !versus || reconLevel < TIER2_MAX_LEVEL; }); portraitMap.disabled = !versus; portraitMap.textContent = opponentView ? 'Your fortress' : 'Opponent';
-  document.querySelector('#portrait-flux').textContent = String(Math.floor(human.energy));
-  document.querySelector('#portrait-wave').textContent = `W${snapshot.wave}${snapshot.wave % 5 === 0 ? ' · BOSS' : ''}`;
-  const portraitTempo = document.querySelector('#portrait-tempo');
-  portraitTempo.hidden = !versus;
-  portraitTempo.disabled = !running || !human.tempoCharge || human.tempoQueued;
-  portraitTempo.textContent = human.tempoQueued ? 'Tempo queued' : human.tempoCharge ? 'Tempo ready' : 'Tempo';
-  status.textContent = running && snapshot.message === 'Ready. Start the match.' ? 'Match running.' : snapshot.message;
   recon.hidden = !versus || !reconLevel; if (versus && reconLevel) { const roots = [...Object.entries(bot.tower).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`), ...Object.entries(bot.mutations).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`)].join(', ') || 'none'; const specializations = Object.entries(bot.tier2).map(([root, choices]) => `${root}: ${Object.entries(choices).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`).join(', ') || 'none'}`).join(' | '); const ultimates = Object.values(bot.tier3).flatMap((choices) => Object.entries(choices).filter(([, value]) => value).map(([id]) => id)).join(', ') || 'none'; const composition = bot.creeps.reduce((memo, creep) => { memo[creep.form] = (memo[creep.form] ?? 0) + 1; return memo; }, {}); const compositionText = Object.entries(composition).map(([form, count]) => `${form} ×${count}`).join(', ') || 'no active Kethra'; const cooldowns = [...Object.entries(bot.activeCooldowns).map(([id, value]) => `${id} ${Math.ceil(value)}s`), ...Object.entries(bot.ultimateCooldowns).map(([id, value]) => `${id} ${Math.ceil(value)}s`)].join(' · '); recon.innerHTML = `<h3>Spectral Relay rank ${reconLevel}</h3><p>Bot Core Strain: ${bot.load}/${bot.overloadCap}</p><p>${bot.purchaseLog.map((entry) => entry.label).join(' · ') || 'The bot has not purchased yet.'}</p>${reconLevel >= 2 ? `<p>Tier I: ${roots}</p>` : ''}${reconLevel >= 3 ? `<p>Tier II: ${specializations}</p>` : ''}${reconLevel >= 4 ? `<p>Live composition: ${compositionText}</p><p>Cooldown telemetry: ${cooldowns}</p>` : ''}${reconLevel >= TIER2_MAX_LEVEL ? `<p>Ultimates: ${ultimates}</p>` : ''}`; }
-  upgradePanel.refresh(snapshot, running); renderActionDock(snapshot); touchUi.refresh(snapshot, versus);
+  renderFieldControls(snapshot, opponentView);
+  upgradePanel.refresh(snapshot, running);
+  renderActionDock(snapshot);
+  touchUi.refresh(versus, opponentView);
   result.hidden = !snapshot.result; result.textContent = snapshot.result ?? '';
 }
-function frame(now) { if (running) { const elapsed = previous ? (now - previous) / 1000 : 0; match.step(elapsed); const snapshot = match.snapshot(); if (snapshot.result) running = false; render(snapshot); } previous = now; requestAnimationFrame(frame); }
+function frame(now) {
+  if (running && !paused) {
+    const elapsed = previous ? (now - previous) / 1000 : 0;
+    match.step(elapsed);
+    const snapshot = match.snapshot();
+    if (snapshot.result) {
+      running = false;
+      aim = null;
+      showStatus('');
+    }
+    render(snapshot);
+  }
+  previous = now;
+  requestAnimationFrame(frame);
+}
 const arenaArt = createArenaArt(context, canvas, routePoint);
 const turrets = { human:createTurretMotion(), bot:createTurretMotion() };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -237,8 +503,6 @@ const upgradePanel = createUpgradePanel({
   panel: document.querySelector('#upgrade-panel'),
   sheet: document.querySelector('#upgrade-sheet'),
   desktop: document.querySelector('.right-panel'),
-  descriptions: NODE_INFO,
-  icons: NODE_ICONS,
   purchase(tier, root, id) {
     if (tier === 1) match.buy(root in match.players.human.tower ? 'tower' : 'mutation', root);
     else if (tier === 2) match.buyTier2(root, id);
@@ -248,5 +512,5 @@ const upgradePanel = createUpgradePanel({
     return snapshot.message;
   }
 });
-const touchUi = createTouchUi({ openUpgrades: upgradePanel.open, closeUpgrades: upgradePanel.close });
+const touchUi = createTouchUi({ openUpgrades, closeUpgrades: upgradePanel.close });
 setModeUi(); render(match.snapshot()); requestAnimationFrame(frame);

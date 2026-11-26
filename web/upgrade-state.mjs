@@ -7,19 +7,19 @@ export function upgradeCost(player, tier, id) {
 export function upgradeBlock(state, { tier, root, choice, groupIndex, item, running }) {
   const p=state.players.human, group=UPGRADE_GROUPS[groupIndex];
   if (item.level >= item.max) return 'Maximum rank';
-  if (tier===1 && !item.level && group.nodes.filter(([id])=>(id in p.tower?p.tower:p.mutations)[id]>0).length>=2) return 'Two paths already chosen';
+  if (tier===1 && !item.level && group.nodes.filter(([id])=>(id in p.tower?p.tower:p.mutations)[id]>0).length>=2) return 'You can unlock two basic upgrades per category.';
   if (tier===2) {
-    if (!(root in p.tower?p.tower:p.mutations)[root]) return 'Requires Tier I rank 1';
-    if (!item.level && Object.values(p.tier2[root]).filter(Boolean).length>=2) return 'Two paths already chosen';
+    if (!(root in p.tower?p.tower:p.mutations)[root]) return 'Unlock the basic upgrade first.';
+    if (!item.level && Object.values(p.tier2[root]).filter(Boolean).length>=2) return 'You can unlock two specializations per basic upgrade.';
   }
   if (tier===3) {
-    if(p.tier2[root][choice]<TIER2_MAX_LEVEL) return 'Requires matching Tier II rank 5';
-    if(group.nodes.some(([id])=>Object.values(p.tier3[id]).some(Boolean))) return 'One Ultimate per branch';
+    if(p.tier2[root][choice]<TIER2_MAX_LEVEL) return `Reach rank ${TIER2_MAX_LEVEL} in this specialization first.`;
+    if(group.nodes.some(([id])=>Object.values(p.tier3[id]).some(Boolean))) return 'You can unlock one Ultimate per category.';
   }
   if(state.result) return 'Match finished';
-  if(!running) return 'Start the match to upgrade';
+  if(!running) return 'Start the match to buy upgrades.';
   const price=upgradeCost(p,tier,item.id);
   if(price===null) return 'No upgrades available';
-  if(p.energy<price) return 'Insufficient Flux';
+  if(p.energy<price) return `Need ${Math.ceil(price - p.energy)} more Flux.`;
   return '';
 }

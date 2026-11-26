@@ -1,53 +1,50 @@
 export function createTouchUi({ openUpgrades, closeUpgrades }) {
-  const toolbar = document.querySelector('.phone-toolbar');
-  const dock = document.querySelector('#action-dock');
-  const dockHome = dock.parentElement;
-  const settings = document.querySelector('.settings');
+  const toolbar = document.querySelector('.game-toolbar');
+  const upgradeButton = toolbar.querySelector('[data-open]');
+  const statsButton = toolbar.querySelector('[data-stats]');
+  const rival = toolbar.querySelector('[data-rival]');
   const overview = document.querySelector('.left-panel');
   const phone = matchMedia('(max-width: 760px)');
 
-  function closeOverview() {
-    document.body.classList.remove('overview-open');
-  }
-  function layout() {
-    closeOverview();
-    if (phone.matches) toolbar.after(dock);
-    else dockHome.append(dock);
-    dock.classList.toggle('phone-actions', phone.matches);
-    dock.classList.toggle('panel', !phone.matches);
+  function setOverview(open) {
+    document.body.classList.toggle('overview-open', open);
+    statsButton.setAttribute('aria-expanded', String(open));
   }
 
-  toolbar.querySelector('[data-open]').addEventListener('click', () => {
-    closeOverview();
+  function layout() {
+    setOverview(false);
+    if (phone.matches) upgradeButton.setAttribute('aria-haspopup', 'dialog');
+    else upgradeButton.removeAttribute('aria-haspopup');
+  }
+
+  upgradeButton.addEventListener('click', () => {
+    setOverview(false);
     openUpgrades();
   });
-  toolbar.querySelector('[data-rival]').addEventListener('click', () => {
+  rival.addEventListener('click', () => {
     closeUpgrades();
     document.querySelector('#portrait-map').click();
   });
-  toolbar.querySelector('[data-stats]').addEventListener('click', () => {
+  statsButton.addEventListener('click', () => {
     closeUpgrades();
-    document.body.classList.toggle('overview-open');
-    if (document.body.classList.contains('overview-open')) overview.querySelector('.overview-close').focus();
+    setOverview(true);
+    overview.querySelector('.overview-close').focus();
   });
   overview.querySelector('.overview-close').addEventListener('click', () => {
-    closeOverview();
-    toolbar.querySelector('[data-stats]').focus();
+    setOverview(false);
+    statsButton.focus();
   });
   overview.querySelector('.overview-restart').addEventListener('click', () => {
-    closeOverview();
+    setOverview(false);
     document.querySelector('#restart').click();
   });
-  dockHome.append(settings);
   phone.addEventListener('change', layout);
   layout();
 
-  function refresh(snapshot, versus) {
-    const player = snapshot.players.human;
-    const next = `Next incursion ${Math.ceil(snapshot.nextIncursionIn)}s · Strain ${player.load}/${player.overloadCap}`;
-    const telemetry = document.querySelector('.phone-telemetry');
-    if (telemetry.textContent !== next) telemetry.textContent = next;
-    toolbar.querySelector('[data-rival]').disabled = !versus;
+  function refresh(versus, opponentView) {
+    rival.hidden = !versus;
+    const label = opponentView ? 'Own fortress' : 'Opponent';
+    if (rival.textContent !== label) rival.textContent = label;
   }
   return { refresh };
 }
