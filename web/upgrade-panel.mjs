@@ -256,6 +256,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   description.querySelector('[data-close-description]').addEventListener('click', () => description.close());
   description.addEventListener('close', () => {
+    if (description.open) return;
     if (descriptionTrigger?.isConnected) descriptionTrigger.focus({ preventScroll: true });
     descriptionTrigger = null;
   });
@@ -316,11 +317,12 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     const detailsOpen = description.open;
     const focused = panel.contains(document.activeElement) ? document.activeElement : null;
     cancelHold();
-    if (wasOpen && desktopLayout.matches) sheet.close();
+    if (detailsOpen) description.close();
+    if (wasOpen) sheet.close();
     (desktopLayout.matches ? desktop : sheet).append(panel);
-    if (!desktopLayout.matches && (focused || detailsOpen) && !sheet.open) sheet.showModal();
-    if (detailsOpen && !description.open) description.showModal();
-    else if ((focused || wasOpen) && !detailsOpen) (focused ?? heading).focus({ preventScroll: true });
+    if (!desktopLayout.matches && (focused || detailsOpen)) sheet.showModal();
+    if (detailsOpen) description.showModal();
+    else if (focused || wasOpen) (focused ?? heading).focus({ preventScroll: true });
     if (snapshot) refresh(snapshot, running);
   }
 

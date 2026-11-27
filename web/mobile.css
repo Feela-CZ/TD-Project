@@ -158,6 +158,17 @@ main {
   .dialog-layout { gap: 5px; }
   .dialog-header button, .dialog-tabs button { min-height: 35px; }
 }
+@media (min-aspect-ratio: 1/1) and (max-height: 335px) {
+  .masthead h1 { font-size: 1.04rem; }
+  .game-stage { grid-template-columns: clamp(155px, 26vw, 250px) minmax(0, 1fr); gap: 3px; }
+  .game-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+  .game-toolbar button, .field-actions > button, .game-stage[data-versus] .field-actions { min-height: 32px; }
+  .portrait-hud > div { padding: 2px 4px; }
+  #match-overview .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-screen="match"] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  [data-screen="match"] > .panel { grid-row: span 2; }
+  .overview-restart { grid-column: 2; }
+}
 @media (max-width: 349px) {
   .masthead button { min-height: 37px; padding: 4px 6px; font-size: .78rem; }
   .game-toolbar button { font-size: .7rem; }

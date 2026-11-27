@@ -397,6 +397,7 @@ async function verifyFixedViewports(base) {
     { width: 320, height: 568, touch: true },
     { width: 390, height: 667, touch: true },
     { width: 667, height: 375, touch: true, landscape: true },
+    { width: 740, height: 300, touch: true, landscape: true },
     { width: 844, height: 390, touch: true, landscape: true },
     { width: 1024, height: 600 },
     { width: 1440, height: 900 },
@@ -444,6 +445,17 @@ async function verifyFixedViewports(base) {
       }
       await page.locator('[data-node="damage"]').press('Shift+Enter');
       await checkFit('upgrade description', ['#upgrade-description', '.upgrade-description-body']);
+      if (width === 1440) {
+        await page.setViewportSize({ width: 667, height: 375 });
+        await page.locator('#upgrade-sheet:modal').waitFor();
+        await page.locator('#upgrade-description:modal').waitFor();
+        await checkFit('open description after shrinking', ['#upgrade-description']);
+        assert.equal(await page.evaluate(() => document.activeElement.hasAttribute('data-close-description')), true);
+        await page.setViewportSize({ width, height });
+        await page.locator('#upgrade-description:modal').waitFor();
+        await page.locator('#upgrade-sheet').waitFor({ state: 'hidden' });
+        await checkFit('open description after growing', ['#upgrade-description']);
+      }
       await page.keyboard.press('Escape');
       if (await page.locator('#upgrade-sheet').isVisible()) await page.keyboard.press('Escape');
       await page.locator('[data-stats]').click();
@@ -461,7 +473,7 @@ async function verifyFixedViewports(base) {
       await page.close();
     }
   }
-  console.log('PASS: battlefield, upgrades, descriptions, stats and settings fit six viewports without scrolling.');
+  console.log('PASS: battlefield, upgrades, descriptions, stats and settings fit seven viewports without scrolling.');
 }
 
 try {

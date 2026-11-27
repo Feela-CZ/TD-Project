@@ -36,7 +36,7 @@ export const ULTIMATE_DETAILS = {
   signalCorruption: 'For 6 seconds, the opposing cannon switches targets when possible. Each attacking Kethra can redirect one lethal shot to an ally. Recharges in 70 seconds.',
   nullifyingPurge: 'Removes bonuses to health, armor and speed in the targeted area. Affected Kethra are slowed by 95% for 1.25 seconds. Recharges in 80 seconds.',
   orbitalBreach: 'The first meteor lands after 0.65 seconds. Ordnance and Precision make it stronger. Cadence can add follow-up meteors. Recharges in 75 seconds.',
-  conjunctionSpheres: 'Choose the left or right side of the main firing zone. The cannon can attack both zones independently for 5 seconds. Recharges in 90 seconds.'
+  conjunctionSpheres: 'Choose the side of the main firing zone toward Entry or Return. The cannon can attack both zones independently for 5 seconds. Recharges in 90 seconds.'
 };
 
 export const UPGRADE_EFFECTS = {
@@ -93,5 +93,5 @@ export const UPGRADE_EFFECTS = {
   signalCorruption: 'Disrupt the bot’s targeting and give your attacking Kethra temporary protection.',
   nullifyingPurge: 'Aim at the track to strip bonuses from enemies in that area and slow them.',
   orbitalBreach: 'Aim at the track to call down a meteor.',
-  conjunctionSpheres: 'Temporarily open a second firing zone on the left or right.'
+  conjunctionSpheres: 'Temporarily open a second firing zone toward Entry or Return.'
 };

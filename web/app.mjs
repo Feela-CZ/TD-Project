@@ -419,8 +419,8 @@ function renderActionDock(snapshot) {
     const remaining = player.ultimateCooldowns[id];
     if (id === 'nullifyingPurge' || id === 'orbitalBreach') ability('aim-ultimate', id, label, remaining, 'Aim on track');
     else if (id === 'conjunctionSpheres') {
-      ability('ultimate', id, 'Conjunction · Left', remaining, 'Ready', 'left');
-      ability('ultimate', id, 'Conjunction · Right', remaining, 'Ready', 'right');
+      ability('ultimate', id, 'Conjunction · Entry side', remaining, 'Ready', 'left');
+      ability('ultimate', id, 'Conjunction · Return side', remaining, 'Ready', 'right');
     } else ability('ultimate', id, label, remaining);
   }
 
