@@ -43,9 +43,9 @@ export const TIER2_FAMILIES = Object.freeze({
     { id: 'recon', label: 'Spectral Relay', kind: 'passive', detail: 'Rank 1: purchase and Core Strain alerts. Rank 2: Tier I. Rank 3: Tier II. Rank 4: live Kethra composition and active cooldowns. Rank 5: removes Fog of War, including live HP and full enemy tree.' }
   ]),
   overdrive: Object.freeze([
-    { id: 'adrenaline', label: 'Adrenaline Surge', kind: 'active', detail: 'Opponent speed +30% / 37.5% / 45% / 52.5% / 60% for 3 / 3.25 / 3.5 / 3.75 / 4 s; CD 42 s.' },
-    { id: 'salvo', label: 'Saturation Burst', kind: 'active', detail: 'Hit all Kethra in your Killzone for 125% / 131.25% / 137.5% / 143.75% / 150%; CD 48 s.' },
-    { id: 'phaseShield', label: 'Phase Shift', kind: 'active', detail: 'Global miss chance 35% / 43.75% / 52.5% / 61.25% / 70% for 4 / 4.25 / 4.5 / 4.75 / 5 s; CD 60 s.' }
+    { id: 'adrenaline', label: 'Adrenaline Surge', kind: 'active', detail: 'From rank 1 to 5, attacking Kethra gain 30% / 37.5% / 45% / 52.5% / 60% movement speed for 3 / 3.25 / 3.5 / 3.75 / 4 seconds. Recharges in 42 seconds.' },
+    { id: 'salvo', label: 'Saturation Burst', kind: 'active', detail: 'From rank 1 to 5, each round deals 125% / 131.25% / 137.5% / 143.75% / 150% of normal shot damage. Recharges in 48 seconds.' },
+    { id: 'phaseShield', label: 'Phase Shift', kind: 'active', detail: 'From rank 1 to 5, shots against your attacking Kethra have a 35% / 43.75% / 52.5% / 61.25% / 70% chance to miss for 4 / 4.25 / 4.5 / 4.75 / 5 seconds. Recharges in 60 seconds.' }
   ])
 });
 

@@ -1,8 +1,11 @@
 import { UPGRADE_GROUPS, TIER2_FAMILIES, TIER3_FAMILIES, TIER1_MAX_LEVEL, TIER2_MAX_LEVEL } from '../dist/live.mjs';
 import { upgradeCost, upgradeBlock } from './upgrade-state.mjs';
-import { BASIC_UPGRADES, UPGRADE_EFFECTS } from './upgrade-copy.mjs';
+import { BASIC_UPGRADES, UPGRADE_EFFECTS, ULTIMATE_DETAILS } from './upgrade-copy.mjs';
 
 const makeBasic = ([id]) => ({ id, label: BASIC_UPGRADES[id].name, tier: 1, max: TIER1_MAX_LEVEL });
+const HOLD_DELAY = 550;
+const HOLD_TOLERANCE = 10;
+const TIER_LABELS = ['Tier I · Basic upgrade', 'Tier II · Specialization', 'Tier III · Ultimate'];
 
 export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const mobile = matchMedia('(max-width: 760px)');
@@ -22,10 +25,14 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const name = detail.querySelector('[data-upgrade-name]');
   const kind = detail.querySelector('[data-upgrade-kind]');
   const effect = detail.querySelector('[data-upgrade-effect]');
-  const numbers = detail.querySelector('.upgrade-numbers');
-  const numbersText = numbers.querySelector('p');
   const instruction = detail.querySelector('[data-upgrade-instruction]');
   const feedback = detail.querySelector('[data-upgrade-feedback]');
+  const description = panel.querySelector('#upgrade-description');
+  const descriptionTitle = description.querySelector('#upgrade-description-title');
+  const descriptionTier = description.querySelector('[data-description-tier]');
+  const descriptionLead = description.querySelector('[data-description-lead]');
+  const descriptionBody = description.querySelector('[data-description-body]');
+  const descriptionRequirement = description.querySelector('[data-description-requirement]');
 
   const firstRoots = UPGRADE_GROUPS.map(group => group.nodes[0][0]);
   const roots = [...firstRoots];
@@ -33,6 +40,9 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   let snapshot, running, drawnGroup, drawnRoot;
   let selected = null;
   let armed = false;
+  let hold = null;
+  let suppressPointerClick = false;
+  let descriptionTrigger = null;
   let basics = [];
   let paths = [];
   let finalUpgrades = [];
@@ -76,6 +86,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
       button.type = 'button';
       button.className = 'tree-node';
       button.dataset.node = offer.id;
+      button.setAttribute('aria-keyshortcuts', 'Shift+Enter');
       caption.textContent = offer.label;
       button.append(caption, status);
       nodes.set(offer.id, { button, status, offer });
@@ -165,15 +176,12 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     armed = false;
     prompt.hidden = false;
     detailBody.hidden = true;
-    numbers.open = false;
     detail.removeAttribute('data-tier');
     text(feedback, '');
   }
 
   function showDetail(offer) {
     const basic = BASIC_UPGRADES[offer.id];
-    const summary = basic?.effect ?? UPGRADE_EFFECTS[offer.id];
-    const exact = basic?.details ?? offer.detail;
     selected = offer.id;
     armed = true;
     prompt.hidden = true;
@@ -181,12 +189,81 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     detail.dataset.tier = offer.tier;
     text(name, offer.label);
     text(kind, offer.kind === 'active' || offer.id === 'overdrive' ? 'Active' : '');
-    text(effect, summary);
-    numbers.open = false;
-    numbers.hidden = !exact || exact === summary;
-    text(numbersText, exact ?? '');
+    text(effect, basic?.effect ?? UPGRADE_EFFECTS[offer.id]);
     text(feedback, '');
   }
+
+  function openDescription(trigger) {
+    const offer = nodes.get(trigger.dataset.node)?.offer;
+    if (!offer || description.open) return;
+    cancelHold();
+    const basic = BASIC_UPGRADES[offer.id];
+    const mechanics = basic?.details ?? ULTIMATE_DETAILS[offer.id] ?? offer.detail;
+    const active = offer.id === 'overdrive' || offer.kind === 'active';
+    const requirement = offer.tier === 2 ? `${BASIC_UPGRADES[currentRoot()].name} at rank 1`
+      : offer.tier === 3 ? `${nodes.get(offer.choice).offer.label} at rank ${TIER2_MAX_LEVEL}` : '';
+    text(descriptionTier, TIER_LABELS[offer.tier - 1] + (active ? ' · Active' : ''));
+    text(descriptionTitle, offer.label);
+    text(descriptionLead, basic?.effect ?? UPGRADE_EFFECTS[offer.id]);
+    text(descriptionBody, mechanics);
+    text(descriptionRequirement, requirement && `Requires ${requirement}.`);
+    descriptionRequirement.hidden = !requirement;
+    description.dataset.tier = offer.tier;
+    descriptionTrigger = trigger;
+    armed = false;
+    refresh(snapshot, running);
+    description.showModal();
+  }
+
+  function cancelHold() {
+    if (!hold) return;
+    clearTimeout(hold.timer);
+    hold = null;
+  }
+
+  document.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.button !== 0) return;
+    suppressPointerClick = false;
+    cancelHold();
+    const trigger = event.target.closest('.tree-node');
+    if (!trigger || !tree.contains(trigger) || description.open) return;
+    const timer = setTimeout(() => {
+      if (!tree.contains(trigger)) {
+        cancelHold();
+        return;
+      }
+      suppressPointerClick = true;
+      openDescription(trigger);
+    }, HOLD_DELAY);
+    hold = { id: event.pointerId, x: event.clientX, y: event.clientY, timer };
+  }, true);
+
+  document.addEventListener('pointermove', event => {
+    if (hold?.id !== event.pointerId || Math.hypot(event.clientX - hold.x, event.clientY - hold.y) <= HOLD_TOLERANCE) return;
+    cancelHold();
+    suppressPointerClick = true;
+  }, true);
+  for (const type of ['pointerup', 'pointercancel']) {
+    document.addEventListener(type, event => {
+      if (hold?.id === event.pointerId) cancelHold();
+    }, true);
+  }
+  document.addEventListener('click', event => {
+    if (!suppressPointerClick || event.detail === 0) return;
+    suppressPointerClick = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+  tree.addEventListener('contextmenu', event => {
+    if ((hold || suppressPointerClick) && event.target.closest('.tree-node')) event.preventDefault();
+  });
+  window.addEventListener('blur', cancelHold);
+
+  description.querySelector('[data-close-description]').addEventListener('click', () => description.close());
+  description.addEventListener('close', () => {
+    if (descriptionTrigger?.isConnected) descriptionTrigger.focus({ preventScroll: true });
+    descriptionTrigger = null;
+  });
 
   function buy(offer) {
     const previous = rank(offer);
@@ -231,7 +308,9 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   });
 
   panel.addEventListener('keydown', event => {
-    if (event.repeat && event.key === 'Enter' && event.target.matches('.tree-node')) event.preventDefault();
+    if (event.key !== 'Enter' || !event.target.matches('.tree-node')) return;
+    if (event.repeat || event.shiftKey) event.preventDefault();
+    if (event.shiftKey && !event.repeat) openDescription(event.target);
   });
 
   function open() {
@@ -240,6 +319,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   }
 
   function close() {
+    cancelHold();
+    if (description.open) description.close();
     if (sheet.open) sheet.close();
   }
 

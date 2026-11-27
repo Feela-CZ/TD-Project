@@ -30,6 +30,30 @@ async function capture(page, name) {
   if (output) await page.screenshot({ path: join(output, `${name}.png`), fullPage: true });
 }
 
+async function holdUpgrade(page, node, dialog, mobile) {
+  await node.scrollIntoViewIfNeeded();
+  const box = await node.boundingBox();
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  if (mobile) {
+    const cdp = await page.context().newCDPSession(page);
+    try {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await dialog.waitFor();
+    } finally {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await cdp.detach();
+    }
+  } else {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    try {
+      await dialog.waitFor();
+    } finally {
+      await page.mouse.up();
+    }
+  }
+}
+
 async function scenario(base, mobile, offline = false) {
   const page = await browser.newPage(mobile
     ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }
@@ -52,6 +76,10 @@ async function scenario(base, mobile, offline = false) {
   const level = id => node(id).locator('small').textContent();
   const start = page.locator('#start');
   const upgrades = page.locator('[data-open]');
+  const description = panel.locator('#upgrade-description');
+  const descriptionTitle = description.locator('h2');
+  const mechanics = description.locator('[data-description-body]');
+  const requirement = description.locator('[data-description-requirement]');
 
   try {
     await page.clock.install();
@@ -78,8 +106,18 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await panel.locator('.tree-node').count(), 9);
     assert.equal(await panel.locator('#upgrade-detail button').count(), 0, 'purchases take place on the tree itself');
     assert.equal(await panel.locator('[data-upgrade-details]').isVisible(), false);
+    assert.match(await panel.locator('.upgrade-help').textContent(), /Hold an upgrade for details/);
     await press(node('damage'));
     assert.match(await panel.locator('[data-upgrade-effect]').textContent(), /Each shot deals more damage/);
+    if (!mobile) {
+      await node('damage').press('Shift+Enter');
+      assert.equal(await descriptionTitle.textContent(), 'Shot damage');
+      assert.match(await mechanics.textContent(), /\+5% base damage per rank/);
+      assert.equal(await requirement.isVisible(), false);
+      await page.keyboard.press('Escape');
+      await description.waitFor({ state:'hidden' });
+      await page.waitForFunction(() => document.activeElement.dataset.node === 'damage');
+    }
     await press(panel.locator('[data-group="2"]'));
     await press(node('overdrive'));
     assert.equal(await instruction(), 'Start the match to buy upgrades.');
@@ -90,6 +128,11 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await instruction(), 'Reach rank 5 in this specialization first.');
     assert.equal(await panel.locator('.tree-node[aria-pressed="true"]').count(), 1);
     assert.equal(await panel.locator('[data-link][data-owned]').count(), 0);
+    await holdUpgrade(page, node('orbitalBreach'), description, mobile);
+    assert.equal(await descriptionTitle.textContent(), 'Orbital Breach');
+    assert.match(await mechanics.textContent(), /0\.65 seconds/);
+    assert.equal(await requirement.textContent(), 'Requires Saturation Burst at rank 5.');
+    await press(description.locator('[data-close-description]'));
     if (mobile) await press(panel.locator('[data-close-upgrade]'));
 
     await press(start);
@@ -113,6 +156,30 @@ async function scenario(base, mobile, offline = false) {
     await press(node('salvo'));
     assert.equal(await flux(), before);
     assert.equal(await level('salvo'), '60 Flux');
+    if (!mobile && !offline) {
+      const box = await node('salvo').boundingBox();
+      const x = box.x + box.width / 2, y = box.y + box.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + 18, y);
+      await page.clock.runFor(650);
+      await page.mouse.up();
+      assert.equal(await description.isVisible(), false, 'moving the pointer cancels the hold');
+      assert.equal(await flux(), before, 'releasing a drag on the same node must not buy it');
+    }
+    await holdUpgrade(page, node('salvo'), description, mobile);
+    assert.equal(await description.isVisible(), true, 'releasing the hold keeps the description open');
+    assert.equal(await descriptionTitle.textContent(), 'Saturation Burst');
+    assert.match(await mechanics.textContent(), /125%.*Recharges in 48 seconds/);
+    assert.equal(await requirement.textContent(), 'Requires Surge Core at rank 1.');
+    assert.equal(await flux(), before, 'releasing a long press must not buy a selected upgrade');
+    assert.equal(await level('salvo'), '60 Flux');
+    if (!offline && output) await page.screenshot({ path: join(output, mobile ? 'mobile-upgrade-description.png' : 'desktop-upgrade-description.png') });
+    await page.keyboard.press('Escape');
+    await description.waitFor({ state:'hidden' });
+    if (mobile) assert.equal(await page.locator('#upgrade-sheet').isVisible(), true, 'closing details keeps the upgrade drawer open');
+    await press(node('salvo'));
+    assert.equal(await flux(), before, 'closing the description leaves the purchase disarmed');
     await press(node('salvo'));
     assert.equal(before - await flux(), 60, 'Saturation Burst must debit its displayed price');
     assert.equal(await level('salvo'), '1 / 5');
@@ -166,7 +233,7 @@ async function scenario(base, mobile, offline = false) {
     await press(opponent);
     assert.equal(await page.locator('#portrait-map').textContent(), 'Opponent');
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} tree order, single detail, two-step purchases, earned links, Flux debit, pause, slots, restart and opponent view.`);
+    console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} upgrade tree, hold-to-read, two-step purchases, paid links, pause, restart and opponent view.`);
   } finally {
     await page.close();
   }

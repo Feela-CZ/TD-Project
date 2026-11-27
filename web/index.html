@@ -79,11 +79,23 @@
               <div data-upgrade-details hidden>
                 <div class="upgrade-detail-title"><h3 data-upgrade-name></h3><span data-upgrade-kind></span></div>
                 <p id="selected-upgrade-description" data-upgrade-effect></p>
-                <details class="upgrade-numbers" hidden><summary>Details</summary><p></p></details>
                 <p class="upgrade-instruction" data-upgrade-instruction></p>
               </div>
               <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
             </section>
+            <p class="upgrade-help">Hold an upgrade for details. <span class="upgrade-help-key"><kbd>Shift</kbd> + <kbd>Enter</kbd></span></p>
+            <dialog class="upgrade-description" id="upgrade-description" aria-labelledby="upgrade-description-title">
+              <header class="upgrade-description-header">
+                <div><p data-description-tier></p><h2 id="upgrade-description-title"></h2></div>
+                <button type="button" data-close-description autofocus>Close</button>
+              </header>
+              <p class="upgrade-description-lead" data-description-lead></p>
+              <section class="upgrade-description-body" aria-labelledby="upgrade-mechanics">
+                <h3 id="upgrade-mechanics">How it works</h3>
+                <p data-description-body></p>
+              </section>
+              <p class="upgrade-description-requirement" data-description-requirement></p>
+            </dialog>
           </section>
         </aside>
       </section>
