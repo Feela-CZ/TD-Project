@@ -4,7 +4,6 @@ import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { routePoint } from '../web/arena-route.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -92,7 +91,7 @@ async function scenario(base, mobile, offline = false) {
     }, offline);
     await start.waitFor();
     assert.equal(await flux(), 150);
-    assert.match(await page.locator('#field-tip').textContent(), /cannon fires on the gold track/);
+    assert.match(await page.locator('#field-tip').textContent(), /cannon fires on its own/);
     assert.equal(await page.locator('#portrait-wave').textContent(), 'Wave 1 / 60');
     assert.equal(await page.locator('#strain-meter').getAttribute('max'), '100');
     assert.equal(await page.locator('[data-rival]').isVisible(), false);
@@ -245,7 +244,7 @@ async function scenario(base, mobile, offline = false) {
 }
 
 async function verifyTurretArt(base) {
-  const page = await browser.newPage({ viewport: { width:390, height:844 }, hasTouch: true, isMobile: true });
+  const page = await browser.newPage({ viewport: { width:1440, height:1000 } });
   try {
     await page.addInitScript(() => {
       window.muzzleFlashes = [];
@@ -281,13 +280,12 @@ async function verifyTurretArt(base) {
     await page.goto(base);
     await page.waitForFunction(() => window.fortressFrame?.barrel);
     const idle = await page.evaluate(() => window.fortressFrame);
-    await page.locator('#start').tap();
+    await page.locator('#start').click();
     const now = await page.evaluate(() => Date.now());
     await page.clock.pauseAt(now + 500);
-    await page.clock.runFor(2200);
-    assert.equal(await page.evaluate(() => window.muzzleFlashes.length), 0, 'the cannon waits until the first Kethra is in range');
+    await page.clock.runFor(20_000);
     let flashes = await page.evaluate(() => window.muzzleFlashes);
-    for (let step = 0; !flashes.length && step < 40; step++) {
+    for (let step = 0; !flashes.length && step < 120; step++) {
       await page.clock.runFor(25);
       flashes = await page.evaluate(() => window.muzzleFlashes);
     }
@@ -308,7 +306,7 @@ async function verifyTurretArt(base) {
 }
 
 async function verifyAiming(base) {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   try {
     await page.route('**/dist/live.mjs', async route => {
       const response = await route.fetch();
@@ -320,56 +318,56 @@ async function verifyAiming(base) {
         };` });
     });
     await page.goto(base);
-    await page.locator('#start').tap();
+    await page.locator('#start').click();
     await page.evaluate(() => {
       window.aimingTestMatch.players.human.energy = 100000;
     });
 
-    await page.locator('[data-open]').tap();
-    await page.locator('[data-group="2"]').tap();
+    await page.locator('[data-group="2"]').click();
     const root = page.locator('[data-node="overdrive"]');
-    await root.tap();
-    await root.tap();
+    await root.click();
+    await root.press('Enter');
     assert.equal(await root.locator('small').textContent(), '1 / 9');
     const salvo = page.locator('[data-node="salvo"]');
     for (let rank = 0; rank < 5; rank++) {
-      await salvo.tap();
-      await salvo.tap();
+      await salvo.click();
+      await salvo.click();
     }
     const orbital = page.locator('[data-node="orbitalBreach"]');
     const edge = page.locator('[data-link="orbitalBreach"]');
-    await orbital.tap();
+    await orbital.click();
     assert.equal(await edge.getAttribute('data-owned'), null);
     assert.equal(await page.locator('[data-aim-ultimate="orbitalBreach"]').count(), 0);
-    await orbital.tap();
+    await orbital.click();
     assert.equal(await orbital.locator('small').textContent(), 'Unlocked');
     assert.equal(await edge.getAttribute('data-owned'), '');
     assert.notEqual(await edge.evaluate(link => getComputedStyle(link, '::before').boxShadow), 'none');
     assert.equal(await page.locator('[data-link="conjunctionSpheres"]').getAttribute('data-owned'), null);
-    await capture(page, 'mobile-ultimate');
-    await page.locator('[data-close-upgrade]').tap();
+    await capture(page, 'desktop-ultimate');
 
     const aim = page.locator('[data-aim-ultimate="orbitalBreach"]');
     const canvas = page.locator('#arena');
     const cancel = page.locator('#cancel-aim');
-    await aim.tap();
+    await aim.click();
     await cancel.waitFor();
-    assert.match(await page.locator('#field-tip').textContent(), /tap the track to aim/i);
+    assert.match(await page.locator('#field-tip').textContent(), /pick a spot on the track/i);
     assert.equal(await page.evaluate(() => document.activeElement.id), 'arena');
-    await cancel.tap();
+    await page.keyboard.press('Escape');
     assert.equal(await cancel.isVisible(), false);
     assert.match(await aim.textContent(), /Aim on track/);
-    await aim.tap();
+    await aim.click();
     const { width, height } = await canvas.boundingBox();
-    await canvas.tap({ position: { x: width / 2, y: height / 2 } });
-    assert.equal(await cancel.isVisible(), true, 'tapping outside the track must not spend the ability');
-    const point = routePoint(.18);
-    await canvas.tap({ position: { x: point.x * width / 420, y: point.y * height / 700 } });
+    await canvas.click({ position: { x: width / 2, y: height / 2 } });
+    assert.equal(await cancel.isVisible(), true, 'clicking outside the track must not spend the ability');
+    await cancel.click();
+    await aim.click();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('Enter');
     assert.equal(await cancel.isVisible(), false);
     assert.match(await aim.textContent(), /Recharging/);
     const progress = await page.evaluate(() => window.aimingTestMatch.players.human.breachScars[0].progress);
-    assert.ok(Math.abs(progress - .18) < .01, 'the cast must land at the tapped track position');
-    console.log('PASS: touch Tier III purchases, exact Ultimate link, and targeted ability aim, cancel and cast.');
+    assert.equal(progress, .48, 'the cast must land at the selected track position');
+    console.log('PASS: keyboard and Tier III purchases, exact Ultimate link, and targeted ability aim, cancel and cast.');
   } finally {
     await page.close();
   }

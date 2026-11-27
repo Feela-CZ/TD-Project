@@ -1,5 +1,4 @@
-import { FIRING_CENTER, routeBearing, routePoint } from './arena-route.mjs';
-import { BARREL_REACH, FORTRESS } from './turret-motion.mjs';
+import { BARREL_REACH } from './turret-motion.mjs';
 
 const fortressSprites = {
   foundation: [0, 0, 288, 288],
@@ -95,163 +94,47 @@ function paintTerrain(width, height) {
   return tile;
 }
 
-export function createArenaArt(ctx, canvas, fortressAtlas) {
+export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
   const terrain = paintTerrain(canvas.width, canvas.height);
-  const segments = new Map();
-
   function route(from, to) {
-    const key = `${from}:${to}`;
-    if (segments.has(key)) return segments.get(key);
     const path = new Path2D();
-    const steps = Math.ceil((to - from) * 160);
-    for (let i = 0; i <= steps; i++) {
-      const point = routePoint(from + (to - from) * i / steps);
+    for (let i = 0; i <= 100; i++) {
+      const point = routePoint(from + (to - from) * i / 100, 'human');
       if (i === 0) path.moveTo(point.x, point.y);
       else path.lineTo(point.x, point.y);
     }
-    segments.set(key, path);
     return path;
   }
 
   const track = route(0, 1);
-  track.closePath();
-  const breach = routePoint(0);
-  const firingZones = new Map();
+  const sectors = new Map();
+  const portals = [routePoint(0, 'human'), routePoint(1, 'human')];
 
-  function firingZone(coverage) {
-    if (firingZones.has(coverage)) return firingZones.get(coverage);
-    const start = FIRING_CENTER - coverage / 2;
-    const end = FIRING_CENTER + coverage / 2;
-    const entry = routePoint(start);
-    const exit = routePoint(end);
-    const offset = point => Math.atan2(point.y - FORTRESS.y, point.x - FORTRESS.x);
-    const radius = Math.hypot(entry.x - FORTRESS.x, entry.y - FORTRESS.y);
-    const startAngle = offset(entry), endAngle = offset(exit);
-    const outline = new Path2D();
-    outline.arc(FORTRESS.x, FORTRESS.y, radius, startAngle, endAngle);
-    const area = new Path2D(outline);
-    area.lineTo(FORTRESS.x, FORTRESS.y);
-    area.closePath();
-    const path = route(start, end);
-    const zone = { start, end, path, outline, area };
-    firingZones.set(coverage, zone);
-    return zone;
-  }
-
-  function entryGate(progress, color) {
-    const point = routePoint(progress);
-    ctx.save();
-    ctx.translate(point.x, point.y);
-    ctx.rotate(routeBearing(progress));
-    ctx.fillStyle = '#151b18';
-    ctx.fillRect(-3, -22, 6, 44);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -22);
-    ctx.lineTo(0, 22);
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.fillRect(-4, -23, 8, 4);
-    ctx.fillRect(-4, 19, 8, 4);
-    ctx.restore();
-  }
-
-  function directionMark(progress, color) {
-    const point = routePoint(progress);
-    ctx.save();
-    ctx.translate(point.x, point.y);
-    ctx.rotate(routeBearing(progress));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(-4, -5);
-    ctx.lineTo(3, 0);
-    ctx.lineTo(-4, 5);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function trackLabel(value, x, y, color) {
-    ctx.textAlign = 'center';
-    ctx.font = '750 12px system-ui';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#111713';
-    ctx.strokeText(value, x, y);
-    ctx.fillStyle = color;
-    ctx.fillText(value, x, y);
-  }
-
-  function drawTrack(time, color, coverage, extension) {
-    const zone = firingZone(coverage);
+  function drawTrack(time, color, coverage) {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    ctx.fillStyle = `${color}0c`;
-    ctx.fill(zone.area);
-    ctx.strokeStyle = `${color}80`;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 7]);
-    ctx.stroke(zone.outline);
-    ctx.setLineDash([]);
-
-    for (const [width, tint] of [[42, '#0b100e'], [36, '#596453'], [33, '#242e26'], [23, '#18201b']]) {
-      ctx.lineWidth = width;
-      ctx.strokeStyle = tint;
-      ctx.stroke(track);
+    for (const [width, tint] of [[40, '#080c0a'], [34, '#65705a'], [31, '#262e27'], [21, '#151b17']]) {
+      ctx.lineWidth = width; ctx.strokeStyle = tint; ctx.stroke(track);
     }
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#9aaea091';
-    ctx.setLineDash([8, 14]);
-    ctx.lineDashOffset = -time * 10;
-    ctx.stroke(track);
+    ctx.lineWidth = 25; ctx.strokeStyle = `${color}39`;
+    if (!sectors.has(coverage)) sectors.set(coverage, route((1 - coverage) / 2, (1 + coverage) / 2));
+    ctx.stroke(sectors.get(coverage));
+    ctx.lineWidth = 2; ctx.strokeStyle = `${color}a0`; ctx.setLineDash([10, 14]);
+    ctx.lineDashOffset = -time * 18; ctx.stroke(track); ctx.setLineDash([]);
 
-    if (extension) {
-      ctx.setLineDash([]);
-      ctx.strokeStyle = '#c4a7fa80';
-      ctx.lineWidth = 30;
-      ctx.lineCap = 'butt';
-      ctx.stroke(route(extension.start, extension.end));
+    for (const [index, {x, y}] of portals.entries()) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
+      ctx.shadowBlur = 17; ctx.shadowColor = color; ctx.fillStyle = '#121913';
+      ctx.fillRect(-15, -15, 30, 30);
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(-15, -15, 30, 30);
+      ctx.shadowBlur = 0;
+      ctx.rotate(time * (index ? .85 : -.85));
+      ctx.strokeStyle = `${color}a0`; ctx.strokeRect(-8, -8, 16, 16);
+      ctx.restore();
+      ctx.fillStyle = '#dedac3'; ctx.font = '700 8px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(index ? 'RETURN' : 'ENTRY', x, y + 34);
     }
-
-    ctx.lineCap = 'butt';
-    ctx.setLineDash([]);
-    ctx.strokeStyle = `${color}9b`;
-    ctx.lineWidth = 33;
-    ctx.stroke(zone.path);
-    ctx.strokeStyle = '#3c3121';
-    ctx.lineWidth = 25;
-    ctx.stroke(zone.path);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([10, 12]);
-    ctx.stroke(zone.path);
-    ctx.setLineDash([]);
-    ctx.lineCap = 'round';
-
-    entryGate(zone.start, color);
-    entryGate(zone.end, color);
-    for (const progress of [.49, .68, .87]) directionMark(progress, '#bdd0c0');
-    for (const progress of [.11, .19, .27]) directionMark(progress, '#ffe6b2');
-
-    ctx.save();
-    ctx.translate(breach.x, breach.y);
-    ctx.rotate(Math.PI / 4);
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = '#7edded';
-    ctx.fillStyle = '#142823';
-    ctx.fillRect(-10, -10, 20, 20);
-    ctx.lineWidth = 1.6;
-    ctx.strokeStyle = '#8de1d4';
-    ctx.strokeRect(-10, -10, 20, 20);
-    ctx.shadowBlur = 0;
-    ctx.strokeRect(-4, -4, 8, 8);
-    ctx.restore();
-
-    trackLabel('OUT OF CANNON RANGE', 210, 214, '#bfcdbe');
-    trackLabel('FIRING RANGE', 210, 456, color);
-    trackLabel('BREACH', breach.x + 54, breach.y + 5, '#a3eadf');
     ctx.restore();
   }
 
