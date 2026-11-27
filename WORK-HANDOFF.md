@@ -2,7 +2,7 @@
 
 **Status · 2026-11-24** — First playable rescue candidate. Start from [`td-rescue/playtest`](https://github.com/Feela-CZ/TD-Project/tree/td-rescue/playtest) at [`e941fc2`](https://github.com/Feela-CZ/TD-Project/commit/e941fc2feb1dec7c43d193f7f0994c36d66b6760).
 
-**Public playtest · 2026-11-25** — [GitHub Pages](https://feela-cz.github.io/TD-Project/web/) serves `main` at `e941fc2`. [Deployment](https://github.com/Feela-CZ/TD-Project/actions/runs/45568085811) passed verification, build, and deploy. A live browser check started a match and purchased Saturation Burst at rank 1 for 60 Flux.
+**Public playtest · 2026-11-27** — [GitHub Pages](https://feela-cz.github.io/TD-Project/web/) serves `main` at `6ec00f5`, including the portrait arena, rotating turret and upgrade tree. [Deployment](https://github.com/Feela-CZ/TD-Project/actions/runs/45996690397) passed verification, build and deploy. The public page and arena, sprite and engine assets were checked against the released files.
 
 - **Delivered:** Fixed the local browser launch, unified the desktop and touch purchase path, rebuilt the arena and HUD in a provisional art direction, and added a standalone offline HTML playtest. The release-gate change lives on the candidate branch.
 - **Verified locally:** Node core and live tests, the 27 Tier II paths, 27 Ultimates, and real Chromium desktop, emulated touch, and offline HTML scenarios. The purchase check uses normal starting Flux and covers lock, price, debit, activation, cooldown, cancellation, and restart.
