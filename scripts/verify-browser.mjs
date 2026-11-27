@@ -82,7 +82,8 @@ async function scenario(base, mobile, offline = false) {
   const upgrades = page.locator('[data-open]');
   const description = panel.locator('#upgrade-description');
   const descriptionTitle = description.locator('h2');
-  const mechanics = description.locator('[data-description-body]');
+  const mechanics = description.locator('.upgrade-description-facts');
+  const ranks = description.locator('.upgrade-description-ranks');
   const requirement = description.locator('[data-description-requirement]');
 
   try {
@@ -145,14 +146,16 @@ async function scenario(base, mobile, offline = false) {
     const detailsButton = panel.locator('[data-open-description]');
     await press(detailsButton);
     assert.equal(await descriptionTitle.textContent(), 'Ordnance');
-    assert.match(await mechanics.textContent(), /\+5% base damage per rank/);
+    assert.equal(await ranks.locator('tbody tr').count(), 9);
+    assert.match(await ranks.locator('tbody tr').first().textContent(), /\+5%/);
     await press(description.locator('[data-close-description]'));
     await description.waitFor({ state:'hidden' });
     await page.waitForFunction(() => document.activeElement.hasAttribute('data-open-description'));
     if (!mobile) {
       await node('damage').press('Shift+Enter');
       assert.equal(await descriptionTitle.textContent(), 'Ordnance');
-      assert.match(await mechanics.textContent(), /\+5% base damage per rank/);
+      assert.equal(await ranks.locator('tbody tr').count(), 9);
+    assert.match(await ranks.locator('tbody tr').first().textContent(), /\+5%/);
       assert.equal(await requirement.isVisible(), false);
       await page.keyboard.press('Escape');
       await description.waitFor({ state:'hidden' });
@@ -174,7 +177,7 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await panel.locator('[data-link][data-owned]').count(), 0);
     await holdUpgrade(page, node('orbitalBreach'), description, mobile);
     assert.equal(await descriptionTitle.textContent(), 'Orbital Breach');
-    assert.match(await mechanics.textContent(), /0\.65 seconds/);
+    assert.match(await mechanics.textContent(), /0\.65 s/);
     assert.equal(await requirement.textContent(), 'Requires Saturation Burst at rank 5.');
     await press(description.locator('[data-close-description]'));
     if (mobile) await press(panel.locator('[data-close-upgrade]'));
@@ -216,7 +219,8 @@ async function scenario(base, mobile, offline = false) {
     await holdUpgrade(page, node('salvo'), description, mobile);
     assert.equal(await description.isVisible(), true, 'releasing the hold keeps the description open');
     assert.equal(await descriptionTitle.textContent(), 'Saturation Burst');
-    assert.match(await mechanics.textContent(), /125%.*Recharges in 48 seconds/);
+    assert.match(await ranks.locator('tbody tr').first().textContent(), /125%/);
+    assert.match(await mechanics.textContent(), /Cooldown\s*48 s/);
     assert.equal(await requirement.textContent(), 'Requires Surge Core at rank 1.');
     assert.equal(await flux(), before, 'releasing a long press must not buy a selected upgrade');
     assert.equal(await level('salvo'), '60 Flux');
@@ -366,6 +370,82 @@ async function verifyTurretArt(base) {
     assert.ok(Math.hypot(flash.x - flash.sprites.barrel.x, flash.y - flash.sprites.barrel.y) < .5, 'the flash must be drawn on the sprite tip');
     await capture(page, 'turret-firing');
     console.log('PASS: the browser drew a fixed foundation, a rotating turret and barrel, and a flash on the sprite tip.');
+  } finally {
+    await page.close();
+  }
+}
+
+async function verifyTreeDetailsAndPortals(base) {
+  const page = await browser.newPage({ viewport: { width: 320, height: 568 }, hasTouch: true, isMobile: true });
+  try {
+    await page.addInitScript(() => {
+      window.portalLabels = new Set();
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (label, ...args) {
+        if (['BREACH', 'LOOP GATE'].includes(label)) window.portalLabels.add(label);
+        return fillText.call(this, label, ...args);
+      };
+    });
+    await page.clock.install();
+    await page.goto(base);
+    await page.waitForFunction(() => window.portalLabels.size === 2);
+    const breachPixels = () => page.locator('#arena').evaluate(canvas =>
+      Array.from(canvas.getContext('2d').getImageData(47, 605, 42, 42).data));
+    const before = await breachPixels();
+    await page.clock.runFor(240);
+    assert.notDeepEqual(await breachPixels(), before, 'Breach animates even before the match starts');
+
+    await page.locator('[data-open]').tap();
+    const tree = page.locator('.upgrade-tree');
+    const groups = page.locator('.upgrade-tabs button');
+    const alignment = await tree.evaluate(element => {
+      const tiers = [...element.querySelectorAll('.tree-row')];
+      const tabs = element.parentElement.querySelector('.upgrade-tabs');
+      return {
+        order: tiers.map(tier => tier.dataset.tier),
+        heading: tiers.every(tier => tier.querySelector('h3').getBoundingClientRect().bottom <=
+          tier.querySelector('.tree-nodes').getBoundingClientRect().top + .5),
+        bottom: tabs.getBoundingClientRect().top > element.getBoundingClientRect().bottom,
+        offset: [...tabs.children].map((tab, index) => tab.getBoundingClientRect().x -
+          tiers.at(-1).querySelectorAll('.tree-node')[index].getBoundingClientRect().x)
+      };
+    });
+    assert.deepEqual(alignment.order, ['3', '2', '1']);
+    assert.ok(alignment.heading && alignment.bottom);
+    assert.deepEqual(alignment.offset, [0, 0, 0], 'family tabs align with the three columns');
+
+    const dialog = page.locator('#upgrade-description');
+    async function verifyDescription(node, expectedRows) {
+      const title = await node.locator('span').textContent();
+      await node.press('Shift+Enter');
+      await dialog.waitFor();
+      assert.equal(await dialog.locator('h2').textContent(), title, 'rapid opening must show the requested ability');
+      const layout = await dialog.evaluate(details => {
+        const bounds = details.getBoundingClientRect();
+        return {
+          rows: details.querySelectorAll('tbody tr').length,
+          fits: bounds.bottom <= innerHeight + .5 && bounds.right <= innerWidth + .5 &&
+            details.scrollHeight <= details.clientHeight + 1 && details.scrollWidth <= details.clientWidth + 1
+        };
+      });
+      assert.ok(layout.fits, (await node.textContent()) + ' fits without scrolling on a 320px phone');
+      if (expectedRows !== undefined) assert.equal(layout.rows, expectedRows);
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
+    }
+    for (let group = 0; group < 3; group++) {
+      await groups.nth(group).tap();
+      for (let root = 0; root < 3; root++) {
+        const node = tree.locator('[data-families] button').nth(root);
+        await node.tap();
+        await verifyDescription(node, 9);
+        for (let column = 0; column < 3; column++) {
+          await verifyDescription(tree.locator('[data-specializations] button').nth(column), 5);
+          await verifyDescription(tree.locator('[data-ultimates] button').nth(column));
+        }
+      }
+    }
+    console.log('PASS: bottom-aligned branches, all 63 descriptions without scrolling, and animated Breach on a phone.');
   } finally {
     await page.close();
   }
@@ -641,7 +721,7 @@ async function verifyFixedViewports(base) {
         await checkFit('upgrade branch', ['#upgrade-panel', '.upgrade-tree']);
       }
       await page.locator('[data-node="damage"]').press('Shift+Enter');
-      await checkFit('upgrade description', ['#upgrade-description', '.upgrade-description-body']);
+      await checkFit('upgrade description', ['#upgrade-description', '.upgrade-description-content']);
       if (width === 1440) {
         await page.setViewportSize({ width: 667, height: 375 });
         await page.locator('#upgrade-sheet:modal').waitFor();
@@ -682,6 +762,7 @@ try {
   assert.equal((await fetch(`${base}/web/art/kethra-terrain.webp`, { method: 'HEAD' })).headers.get('content-type'), 'image/webp');
   browser = await chromium.launch({ executablePath: process.env.KETHRA_BROWSER || undefined });
   await verifyFixedViewports(base);
+  await verifyTreeDetailsAndPortals(base);
   await scenario(base, false);
   await scenario(base, true);
   await verifyTurretArt(base);

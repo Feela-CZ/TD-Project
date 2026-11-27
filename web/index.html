@@ -49,22 +49,20 @@
               <span class="panel-flux" data-panel-flux></span>
               <button type="button" class="upgrade-mobile" data-close-upgrade aria-label="Close upgrades">Close</button>
             </header>
-            <nav class="upgrade-tabs" aria-label="Upgrade branches">
-              <button type="button" data-group="0">Offense</button>
-              <button type="button" data-group="1">Mutation</button>
-              <button type="button" data-group="2">Utility</button>
-            </nav>
             <section class="upgrade-tree" aria-label="Upgrade tree">
-              <section class="tree-row" data-tier="1" aria-label="Tier I · Basic upgrades">
-                <h3 class="tree-tier" aria-hidden="true">I</h3><div class="tree-nodes" data-families></div>
-              </section>
-              <div class="tree-links tree-links-specialization" data-specialization-links aria-hidden="true"></div>
-              <section class="tree-row" data-tier="2" aria-label="Tier II · Specializations">
-                <h3 class="tree-tier" aria-hidden="true">II</h3><div class="tree-nodes" data-specializations></div>
+              <section class="tree-row" data-tier="3" aria-labelledby="tree-tier-3">
+                <h3 class="tree-tier" id="tree-tier-3"><span>Tier III</span></h3>
+                <div class="tree-nodes" data-ultimates></div>
               </section>
               <div class="tree-links tree-links-ultimate" data-ultimate-links aria-hidden="true"></div>
-              <section class="tree-row" data-tier="3" aria-label="Tier III · Ultimates">
-                <h3 class="tree-tier" aria-hidden="true">III</h3><div class="tree-nodes" data-ultimates></div>
+              <section class="tree-row" data-tier="2" aria-labelledby="tree-tier-2">
+                <h3 class="tree-tier" id="tree-tier-2"><span>Tier II</span></h3>
+                <div class="tree-nodes" data-specializations></div>
+              </section>
+              <div class="tree-links tree-links-specialization" data-specialization-links aria-hidden="true"></div>
+              <section class="tree-row" data-tier="1" aria-labelledby="tree-tier-1">
+                <h3 class="tree-tier" id="tree-tier-1"><span>Tier I</span></h3>
+                <div class="tree-nodes" data-families></div>
               </section>
             </section>
             <section class="upgrade-detail" id="upgrade-detail" aria-label="Selected upgrade" hidden>
@@ -76,16 +74,24 @@
               <p class="upgrade-cost" id="selected-upgrade-cost" data-upgrade-cost></p>
               <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
             </section>
+            <nav class="upgrade-tabs" aria-label="Upgrade branches">
+              <button type="button" data-group="0">Offense</button>
+              <button type="button" data-group="1">Mutation</button>
+              <button type="button" data-group="2">Utility</button>
+            </nav>
             <dialog class="upgrade-description" id="upgrade-description" aria-labelledby="upgrade-description-title">
               <header class="upgrade-description-header">
                 <div><p data-description-tier></p><h2 id="upgrade-description-title"></h2></div>
                 <button type="button" data-close-description autofocus>Close</button>
               </header>
-              <p class="upgrade-description-lead" data-description-lead></p>
-              <section class="upgrade-description-body" aria-label="Mechanics">
-                <p data-description-body></p>
-              </section>
-              <p class="upgrade-description-requirement" data-description-requirement></p>
+              <div class="upgrade-description-content">
+                <p class="upgrade-description-lead" data-description-lead></p>
+                <table class="upgrade-description-ranks" aria-label="Upgrade values" hidden>
+                  <thead><tr></tr></thead><tbody></tbody>
+                </table>
+                <dl class="upgrade-description-facts" aria-label="Mechanics" hidden></dl>
+                <p class="upgrade-description-requirement" data-description-requirement></p>
+              </div>
             </dialog>
           </section>
         </aside>

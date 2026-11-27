@@ -24,7 +24,98 @@ export function createArenaArt(ctx, routePoint, fortressAtlas) {
   const sectors = new Map();
   const portals = [routePoint(0, 'human'), routePoint(1, 'human')];
 
-  function drawTrack(time, color, coverage) {
+  function portalLabel(label, x, y, color) {
+    ctx.font = '750 12px system-ui';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#101920';
+    ctx.strokeText(label, x, y + 34);
+    ctx.fillStyle = color;
+    ctx.fillText(label, x, y + 34);
+  }
+
+  function drawBreach({ x, y }, phase) {
+    const pulse = .5 + .5 * Math.sin(phase * 3.2);
+    ctx.save();
+    ctx.translate(x, y);
+    const bloom = ctx.createRadialGradient(0, 0, 3, 0, 0, 36);
+    bloom.addColorStop(0, '#72ffea9e');
+    bloom.addColorStop(.44, '#27d4d87b');
+    bloom.addColorStop(1, '#17a7c000');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(-36, -36, 72, 72);
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 21, 24, -.24, 0, Math.PI * 2);
+    ctx.fillStyle = '#071b2c';
+    ctx.fill();
+    ctx.strokeStyle = '#359bb2';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.lineWidth = 2.3;
+    ctx.shadowColor = '#36f0dc';
+    ctx.shadowBlur = 7 + 6 * pulse;
+    for (let index = 0; index < 3; index++) {
+      const start = phase * .8 + index * Math.PI * 2 / 3;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 21 + 1.5 * pulse, 24, -.24, start, start + 1.27);
+      ctx.strokeStyle = index === 1 ? '#93bdfc' : '#75ffea';
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-14, 8);
+    ctx.lineTo(-6, -3 + Math.sin(phase * 5) * 3);
+    ctx.lineTo(-2, 5);
+    ctx.lineTo(5, -6 + Math.cos(phase * 4) * 3);
+    ctx.lineTo(14, -11);
+    ctx.strokeStyle = '#d6ffff';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    for (let index = 0; index < 7; index++) {
+      const drift = (phase * .62 + index / 7) % 1;
+      const angle = index * 2.4;
+      const distance = 11 + drift * 24;
+      ctx.globalAlpha = 1 - drift;
+      ctx.fillStyle = index % 2 ? '#84f9dd' : '#b4c7ff';
+      ctx.fillRect(Math.cos(angle) * distance, Math.sin(angle) * distance, 2, 2);
+    }
+    ctx.restore();
+    portalLabel('BREACH', x, y, '#b4fff2');
+  }
+
+  function drawLoopGate({ x, y }, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    const glow = ctx.createRadialGradient(0, 3, 2, 0, 3, 31);
+    glow.addColorStop(0, '#ffc37770');
+    glow.addColorStop(1, '#e49c4800');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-31, -28, 62, 62);
+
+    plate([[-22,-16],[22,-16],[26,-10],[26,13],[18,22],[-18,22],[-26,13],[-26,-10]], '#17252b', '#af906a');
+    plate([[-15,-14],[15,-14],[18,12],[12,17],[-12,17],[-18,12]], '#0a171c', '#705a43');
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ffc98c';
+    ctx.shadowColor = '#ffb66e';
+    ctx.shadowBlur = 6;
+    for (let index = 0; index < 3; index++) {
+      const travel = (phase * .78 + index / 3) % 1;
+      const row = -12 + travel * 23;
+      ctx.globalAlpha = .3 + .58 * Math.sin(travel * Math.PI);
+      ctx.beginPath();
+      ctx.moveTo(-9, row);
+      ctx.lineTo(0, row + 5);
+      ctx.lineTo(9, row);
+      ctx.stroke();
+    }
+    ctx.restore();
+    portalLabel('LOOP GATE', x, y, '#ffdfb4');
+  }
+
+  function drawTrack(time, color, coverage, portalPhase) {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -37,18 +128,8 @@ export function createArenaArt(ctx, routePoint, fortressAtlas) {
     ctx.lineWidth = 2; ctx.strokeStyle = `${color}a0`; ctx.setLineDash([10, 14]);
     ctx.lineDashOffset = -time * 18; ctx.stroke(track); ctx.setLineDash([]);
 
-    for (const [index, {x, y}] of portals.entries()) {
-      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
-      ctx.shadowBlur = 17; ctx.shadowColor = color; ctx.fillStyle = '#121913';
-      ctx.fillRect(-15, -15, 30, 30);
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(-15, -15, 30, 30);
-      ctx.shadowBlur = 0;
-      ctx.rotate(time * (index ? .85 : -.85));
-      ctx.strokeStyle = `${color}a0`; ctx.strokeRect(-8, -8, 16, 16);
-      ctx.restore();
-      ctx.fillStyle = '#dedac3'; ctx.font = '700 8px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(index ? 'RETURN' : 'ENTRY', x, y + 26);
-    }
+    drawBreach(portals[0], portalPhase);
+    drawLoopGate(portals[1], portalPhase);
     ctx.restore();
   }
 

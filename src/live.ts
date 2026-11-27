@@ -67,6 +67,37 @@ export const distributedShellRecipientCap = (level) => rankedValue(level, DISTRI
 export const failsafeCocoonChance = (level) => rankedValue(level, FAILSAFE_COCOON_CHANCE);
 export const momentumPlatingPerSpeed = (level) => rankedValue(level, MOMENTUM_PLATING_PER_SPEED);
 export const momentumPlatingCap = (level) => rankedValue(level, MOMENTUM_PLATING_CAP);
+// Ranked values shared by combat and the in-game detail tables.
+export const TIER2_RANK_STATS = Object.freeze({
+  multishot: [SPLIT_VOLLEY_EXTRA_CHANCES],
+  reaper: [[0, ...Array.from({ length: TIER2_MAX_LEVEL }, (_, i) => tier2Value(i + 1, .03, .05))]],
+  cryo: [BIO_TAR_SLOW, BIO_TAR_DURATION, BIO_TAR_THERMITE_TICKS],
+  requiem: [REQUIEM_TRANSFER],
+  burn: [THERMITE_TICK_DAMAGE],
+  rhythm: [COMBAT_RHYTHM_PER_STACK],
+  critChance: [DEADEYE_CHANCE],
+  critMultiplier: [TERMINAL_VECTOR_MULTIPLIER],
+  staticCharge: [STATIC_DISCHARGE_RANGE, STATIC_DISCHARGE_DAMAGE],
+  armorNet: [DISTRIBUTED_SHELL_SHARE, DISTRIBUTED_SHELL_RECIPIENT_CAP],
+  emergency: [FAILSAFE_COCOON_CHANCE],
+  swarm: [[0, ...Array.from({ length: TIER2_MAX_LEVEL }, (_, i) => tier2Value(i + 1, .06, .12))]],
+  inertial: [MOMENTUM_PLATING_PER_SPEED, MOMENTUM_PLATING_CAP],
+  kinetic: [IMPACT_DYNAMO_THRESHOLD, IMPACT_DYNAMO_SPEED, IMPACT_DYNAMO_DURATION],
+  phaseSkip: [PHASE_CURL_CHANCE, PHASE_CURL_DISTANCE],
+  reconstruction: [REGROWTH_RESTORE],
+  biomass: [BIOMASS_POOL_SHARE],
+  homeostasis: [HIVE_EQUILIBRIUM_CADENCE],
+  echo: [ECHO_RESERVE_TICKS],
+  battery: [FLUX_BATTERY_BASE_SHOTS, FLUX_BATTERY_HIGH_SHOTS],
+  recovery: [EXCESS_RECLAMATION_FLUX],
+  painTolerance: [PAIN_TOLERANCE_CAP],
+  expandedField: [KILLZONE_APERTURE],
+  adrenaline: [ADRENALINE_SURGE_SPEED, ADRENALINE_SURGE_DURATION],
+  salvo: [SATURATION_BURST_MULTIPLIER],
+  phaseShield: [PHASE_SHIFT_MISS, PHASE_SHIFT_DURATION]
+});
+export const ENTROPY_VECTOR_ODDS = Object.freeze([[3, .502], [4, .246], [5, .124], [6, .062], [7, .031], [8, .016], [9, .011], [10, .008]]);
+
 export const UPGRADE_GROUPS = Object.freeze([
   { title: 'Offense', branch: 'tower', nodes: [['damage', 'Ordnance'], ['attackSpeed', 'Cadence'], ['crit', 'Precision']] },
   { title: 'Mutation', branch: 'mutation', nodes: [['armor', 'Carapace'], ['speed', 'Kinesis'], ['maxHp', 'Vital Mass']] },
@@ -173,7 +204,7 @@ export class LiveMatch {
     if (hasUltimate(p, 'entropyVector')) {
       const roll = this.random.next();
       let edge = 0;
-      for (const [multiplier, chance] of [[3, .502], [4, .246], [5, .124], [6, .062], [7, .031], [8, .016], [9, .011], [10, .008]]) {
+      for (const [multiplier, chance] of ENTROPY_VECTOR_ODDS) {
         edge += chance;
         if (roll < edge) return multiplier;
       }

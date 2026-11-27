@@ -312,7 +312,7 @@ function drawKethra(creep, point, radius, baseColor) {
   context.restore();
 }
 function drawSide(player, side, color, visible) {
-  arenaArt.drawTrack(snapshotTime, color, visible ? player.killzoneCoverage : .3);
+  arenaArt.drawTrack(snapshotTime, color, visible ? player.killzoneCoverage : .3, portalPhase);
   if (player.conjunctionUntil > snapshotTime && player.conjunctionZone) { context.strokeStyle = '#d9bcff88'; context.lineWidth = 28; context.lineCap = 'round'; context.beginPath(); for (let p = player.conjunctionZone.start; p <= player.conjunctionZone.end + .001; p += .01) { const point = routePoint(Math.min(player.conjunctionZone.end,p), side); p > player.conjunctionZone.start ? context.lineTo(point.x,point.y) : context.moveTo(point.x,point.y); } context.stroke(); }
   for (const scar of player.breachScars.filter((scar) => !scar.remote && scar.end > snapshotTime)) { const point=routePoint(scar.progress,side), alpha=Math.min(1,(scar.end-snapshotTime)/.5); context.globalAlpha=alpha*.65; context.fillStyle='#ff7b57'; context.beginPath(); context.arc(point.x,point.y,23+Math.sin(snapshotTime*8)*3,0,Math.PI*2); context.fill(); context.globalAlpha=1; }
   for (const meteor of player.pendingMeteors) { const point=routePoint(meteor.progress,side); context.strokeStyle='#ffbd71'; context.setLineDash([3,4]); context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,18,0,Math.PI*2); context.stroke(); context.setLineDash([]); }
@@ -430,8 +430,8 @@ function renderActionDock(snapshot) {
     const remaining = player.ultimateCooldowns[id];
     if (id === 'nullifyingPurge' || id === 'orbitalBreach') ability('aim-ultimate', id, label, remaining);
     else if (id === 'conjunctionSpheres') {
-      ability('ultimate', id, 'Conjunction · Entry', remaining, 'left');
-      ability('ultimate', id, 'Conjunction · Return', remaining, 'right');
+      ability('ultimate', id, 'Conjunction · Breach', remaining, 'left');
+      ability('ultimate', id, 'Conjunction · Loop Gate', remaining, 'right');
     } else ability('ultimate', id, label, remaining);
   }
 
@@ -608,14 +608,24 @@ overview.addEventListener('showrecon', () => {
 
 let snapshotTime = 0;
 let latestSnapshot = null;
-function render(snapshot) {
-  latestSnapshot = snapshot;
-  snapshotTime = snapshot.time;
+let portalPhase = 0;
+let nextIdleFrame = 0;
+
+function drawBattlefield(snapshot) {
   context.clearRect(0, 0, canvas.width, canvas.height);
   const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot' && mode.value === 'versus', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
   arenaWrap.toggleAttribute('data-fogged', opponentView && !visible);
   drawSide(viewedPlayer, viewedSide, opponentView ? '#c99ce4' : '#e8bb79', visible); if (opponentView && !visible) drawFogOverlay(reconLevel, bot); if (visible) drawCritFloats(snapshot);
   drawAim();
+  return opponentView;
+}
+
+function render(snapshot) {
+  latestSnapshot = snapshot;
+  snapshotTime = snapshot.time;
+  const opponentView = drawBattlefield(snapshot);
+  const { human, bot } = snapshot.players;
+  const reconLevel = human.tier2.rewardFloor.recon;
   setText(document.querySelector('#clock'), `${String(Math.floor(snapshot.time / 60)).padStart(2, '0')}:${String(Math.floor(snapshot.time % 60)).padStart(2, '0')}`);
   setText(document.querySelector('#bot-overload'), `${bot.load} / ${bot.overloadCap}`);
   for (const [id, player] of Object.entries({ human, bot })) { const earned = document.querySelector(`#${id}-earned`), interest = document.querySelector(`#${id}-interest`), avarice = document.querySelector(`#${id}-avarice`), next = document.querySelector(`#${id}-interest-next`); if (earned) earned.textContent = String(player.earnedEnergy); if (interest) interest.textContent = String(player.interestEnergy); if (avarice) avarice.textContent = String(player.avariceEnergy); if (next) next.textContent = `${player.nextInterestIn.toFixed(1)} s · +${Math.floor(player.nextInterestEstimate)}`; }
@@ -630,6 +640,9 @@ function render(snapshot) {
   result.hidden = !snapshot.result; result.textContent = snapshot.result ?? '';
 }
 function frame(now) {
+  const animatePortals = !paused && !latestSnapshot.result && !reduceMotion.matches;
+  if (animatePortals) portalPhase = now / 1000;
+  else if (reduceMotion.matches) portalPhase = 0;
   if (running && !paused) {
     const elapsed = previous ? (now - previous) / 1000 : 0;
     match.step(elapsed);
@@ -642,6 +655,9 @@ function frame(now) {
       showStatus('');
     }
     render(snapshot);
+  } else if (animatePortals && now >= nextIdleFrame) {
+    nextIdleFrame = now + 1000 / 30;
+    drawBattlefield(latestSnapshot);
   }
   previous = now;
   requestAnimationFrame(frame);

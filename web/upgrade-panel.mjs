@@ -1,6 +1,6 @@
 import { UPGRADE_GROUPS, TIER2_FAMILIES, TIER3_FAMILIES, TIER1_MAX_LEVEL, TIER2_MAX_LEVEL, controlNexusRewardFloor } from '../dist/live.mjs';
 import { upgradeAvailability } from './upgrade-state.mjs';
-import { BASIC_UPGRADES, UPGRADE_EFFECTS, ULTIMATE_DETAILS } from './upgrade-copy.mjs';
+import { UPGRADE_DETAILS, UPGRADE_EFFECTS } from './upgrade-copy.mjs';
 
 const makeBasic = ([id, label]) => ({ id, label, tier: 1, max: TIER1_MAX_LEVEL });
 const HOLD_DELAY = 550;
@@ -28,7 +28,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const descriptionTitle = description.querySelector('#upgrade-description-title');
   const descriptionTier = description.querySelector('[data-description-tier]');
   const descriptionLead = description.querySelector('[data-description-lead]');
-  const descriptionBody = description.querySelector('[data-description-body]');
+  const descriptionRanks = description.querySelector('.upgrade-description-ranks');
+  const descriptionFacts = description.querySelector('.upgrade-description-facts');
   const descriptionRequirement = description.querySelector('[data-description-requirement]');
 
   const firstRoots = UPGRADE_GROUPS.map(group => group.nodes[0][0]);
@@ -172,33 +173,61 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   }
 
   function showDetail(offer) {
-    const basic = BASIC_UPGRADES[offer.id];
     selected = offer.id;
     detail.hidden = false;
     detail.dataset.tier = offer.tier;
     text(name, offer.label);
     text(kind, offer.kind === 'active' || offer.id === 'overdrive' ? 'Active' : '');
-    text(effect, basic?.effect ?? UPGRADE_EFFECTS[offer.id]);
+    text(effect, UPGRADE_EFFECTS[offer.id]);
     text(feedback, '');
+  }
+
+  function renderDescriptionDetails(offer) {
+    const { columns = [], rows = [], facts = [] } = UPGRADE_DETAILS[offer.id];
+    descriptionRanks.hidden = !rows.length;
+    descriptionFacts.hidden = !facts.length;
+    const cell = (tag, value) => {
+      const element = document.createElement(tag);
+      element.textContent = value;
+      return element;
+    };
+    descriptionRanks.tHead.rows[0].replaceChildren(...columns.map(label => {
+      const heading = cell('th', label);
+      heading.scope = 'col';
+      return heading;
+    }));
+    const currentRank = rank(offer);
+    descriptionRanks.tBodies[0].replaceChildren(...rows.map(([first, ...values]) => {
+      const row = document.createElement('tr');
+      const label = cell('th', first);
+      label.scope = 'row';
+      row.append(label, ...values.map(value => cell('td', value)));
+      row.toggleAttribute('data-current-rank', columns[0] === 'Rank' && first === currentRank);
+      return row;
+    }));
+    descriptionFacts.replaceChildren(...facts.map(([label, value]) => {
+      const row = document.createElement('div');
+      row.append(cell('dt', label), cell('dd', value));
+      return row;
+    }));
   }
 
   function openDescription(trigger, returnFocus = trigger) {
     const offer = nodes.get(trigger?.dataset.node)?.offer;
     if (!offer || description.open) return;
     cancelHold();
-    const basic = BASIC_UPGRADES[offer.id];
-    const mechanics = basic?.details ?? ULTIMATE_DETAILS[offer.id] ?? offer.detail;
     const active = offer.id === 'overdrive' || offer.kind === 'active';
     const requirement = offer.tier === 2 ? `${nodes.get(currentRoot()).offer.label} at rank 1`
       : offer.tier === 3 ? `${nodes.get(offer.choice).offer.label} at rank ${TIER2_MAX_LEVEL}` : '';
     text(descriptionTier, TIER_LABELS[offer.tier - 1] + (active ? ' · Active' : ''));
     text(descriptionTitle, offer.label);
-    text(descriptionLead, basic?.effect ?? UPGRADE_EFFECTS[offer.id]);
-    text(descriptionBody, mechanics);
+    text(descriptionLead, UPGRADE_EFFECTS[offer.id]);
+    renderDescriptionDetails(offer);
     text(descriptionRequirement, requirement && `Requires ${requirement}.`);
     descriptionRequirement.hidden = !requirement;
     description.dataset.tier = offer.tier;
     descriptionTrigger = returnFocus;
+    returnFocus.focus({ preventScroll: true });
     description.showModal();
   }
 
@@ -247,11 +276,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   window.addEventListener('blur', cancelHold);
 
   description.querySelector('[data-close-description]').addEventListener('click', () => description.close());
-  description.addEventListener('close', () => {
-    if (description.open) return;
-    if (descriptionTrigger?.isConnected) descriptionTrigger.focus({ preventScroll: true });
-    descriptionTrigger = null;
-  });
 
   function buy(offer) {
     const previous = rank(offer);
@@ -315,8 +339,10 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     if (wasOpen) sheet.close();
     (desktopLayout.matches ? desktop : sheet).append(panel);
     if (!desktopLayout.matches && (focused || detailsOpen)) sheet.showModal();
-    if (detailsOpen) description.showModal();
-    else if (focused || wasOpen) (focused ?? heading).focus({ preventScroll: true });
+    if (detailsOpen) {
+      (descriptionTrigger?.isConnected ? descriptionTrigger : heading).focus({ preventScroll: true });
+      description.showModal();
+    } else if (focused || wasOpen) (focused ?? heading).focus({ preventScroll: true });
     if (snapshot) refresh(snapshot, running);
   }
 
