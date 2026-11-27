@@ -1,9 +1,3 @@
-export const GROUP_COPY = [
-  'Improve the cannon that defends your fortress.',
-  'Strengthen the Kethra you send to the opposing fortress. Useful against a bot.',
-  'Earn more Flux, reinforce your defenses or unlock abilities.'
-];
-
 export const BASIC_UPGRADES = {
   damage: { name: 'Shot damage', effect: 'Each shot deals more damage.', details: '+5% base damage per rank, up to +45%.' },
   attackSpeed: { name: 'Fire rate', effect: 'The cannon fires more often.', details: 'Raises the base fire rate from 1.00 to 1.60 shots per second.' },

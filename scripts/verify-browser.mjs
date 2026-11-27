@@ -45,9 +45,11 @@ async function scenario(base, mobile, offline = false) {
   const panel = page.locator('#upgrade-panel');
   const flux = async () => Number(await page.locator('#portrait-flux').textContent());
   const feedback = () => panel.locator('[data-upgrade-feedback]').textContent();
-  const offer = tier => panel.locator(`[data-buy="${tier}"]`);
-  const status = tier => panel.locator(`#offer-status-${tier}`).textContent();
-  const confirm = panel.locator('[data-confirm-upgrade]');
+  const node = id => panel.locator(`[data-node="${id}"]`);
+  const link = id => panel.locator(`[data-link="${id}"]`);
+  const instruction = () => panel.locator('[data-upgrade-instruction]').textContent();
+  const name = () => panel.locator('[data-upgrade-name]').textContent();
+  const level = id => node(id).locator('small').textContent();
   const start = page.locator('#start');
   const upgrades = page.locator('[data-open]');
 
@@ -69,16 +71,25 @@ async function scenario(base, mobile, offline = false) {
     } else {
       assert.equal(await page.evaluate(() => document.activeElement.id), 'upgrade-title');
     }
-    assert.match(await panel.locator('[data-offer="1"] p').first().textContent(), /Each shot deals more damage/);
-    assert.equal(await panel.locator('.upgrade-paths').getAttribute('open'), null);
+    const [basicRow, specialRow, ultimateRow] = await Promise.all([1, 2, 3].map(tier => panel.locator(`.tree-row[data-tier="${tier}"]`).boundingBox()));
+    assert.ok(basicRow.y > specialRow.y && specialRow.y > ultimateRow.y, 'all three tiers must be visible, rising upward');
+    const colors = await panel.locator('.tree-tier').evaluateAll(tiers => tiers.map(tier => getComputedStyle(tier).color));
+    assert.equal(new Set(colors).size, 3, 'each tier must have a distinct color');
+    assert.equal(await panel.locator('.tree-node').count(), 9);
+    assert.equal(await panel.locator('#upgrade-detail button').count(), 0, 'purchases take place on the tree itself');
+    assert.equal(await panel.locator('[data-upgrade-details]').isVisible(), false);
+    await press(node('damage'));
+    assert.match(await panel.locator('[data-upgrade-effect]').textContent(), /Each shot deals more damage/);
     await press(panel.locator('[data-group="2"]'));
-    await press(panel.locator('[data-family="overdrive"]'));
-    await press(panel.locator('.upgrade-paths > summary'));
-    await press(panel.locator('[data-specialization="salvo"]'));
-    assert.equal(await status(1), 'Start the match to buy upgrades.');
-    assert.equal(await status(2), 'Unlock the basic upgrade first.');
-    assert.equal(await status(3), 'Reach rank 5 in this specialization first.');
-    assert.equal(await offer(2).isEnabled(), false);
+    await press(node('overdrive'));
+    assert.equal(await instruction(), 'Start the match to buy upgrades.');
+    await press(node('salvo'));
+    assert.equal(await instruction(), 'Unlock the basic upgrade first.');
+    await press(node('orbitalBreach'));
+    assert.equal(await name(), 'Orbital Breach');
+    assert.equal(await instruction(), 'Reach rank 5 in this specialization first.');
+    assert.equal(await panel.locator('.tree-node[aria-pressed="true"]').count(), 1);
+    assert.equal(await panel.locator('[data-link][data-owned]').count(), 0);
     if (mobile) await press(panel.locator('[data-close-upgrade]'));
 
     await press(start);
@@ -90,32 +101,42 @@ async function scenario(base, mobile, offline = false) {
     await page.clock.fastForward(10_000);
     assert.equal(await page.locator('#incursion-next').textContent(), timer, 'pausing must freeze the next-wave timer');
     if (mobile) await press(upgrades);
-    assert.equal(await offer(1).isEnabled(), true, 'players can plan and purchase while paused');
-    assert.match(await offer(1).textContent(), /Unlock Surge Core · Free/);
-    await press(offer(1));
-    if (mobile) {
-      await press(panel.locator('[data-cancel-upgrade]'));
-      assert.equal(await flux(), 150);
-      assert.equal(await status(2), 'Unlock the basic upgrade first.');
-      await press(offer(1));
-      await press(confirm);
-    }
-    assert.match(await feedback(), /Surge Core unlocked · Free/);
-    assert.equal(await offer(2).isEnabled(), true);
-    assert.match(await offer(2).textContent(), /60 Flux/);
+    await press(node('overdrive'));
+    assert.match(await instruction(), /again to unlock · Free/);
+    assert.equal(await level('overdrive'), 'Free', 'the first press must only select the upgrade');
+    await press(node('overdrive'));
+    assert.equal(await level('overdrive'), '1 / 9', 'players can plan and purchase while paused');
+    assert.match(await feedback(), /Unlocked · Free/);
+    assert.equal(await level('salvo'), '60 Flux');
+    assert.equal(await link('salvo').getAttribute('data-owned'), null, 'unlocking the parent does not light its child');
     const before = await flux();
-    await press(offer(2));
-    if (mobile) await press(confirm);
+    await press(node('salvo'));
+    assert.equal(await flux(), before);
+    assert.equal(await level('salvo'), '60 Flux');
+    await press(node('salvo'));
     assert.equal(before - await flux(), 60, 'Saturation Burst must debit its displayed price');
-    assert.match(await status(2), /Rank 1 \/ 5/);
-    assert.match(await feedback(), /Saturation Burst unlocked · 60 Flux/);
+    assert.equal(await level('salvo'), '1 / 5');
+    assert.match(await feedback(), /Unlocked · 60 Flux/);
+    assert.equal(await link('salvo').getAttribute('data-owned'), '');
+    assert.notEqual(await link('salvo').evaluate(edge => getComputedStyle(edge, '::before').boxShadow), 'none');
+    assert.equal(await link('adrenaline').evaluate(edge => getComputedStyle(edge, '::before').boxShadow), 'none');
+    assert.equal(await link('adrenaline').getAttribute('data-owned'), null);
+    assert.equal(await link('orbitalBreach').getAttribute('data-owned'), null);
     if (!offline) await capture(page, mobile ? 'mobile-upgrades' : 'desktop-upgrades');
 
-    await press(offer(2));
-    if (mobile) await press(confirm);
-    assert.match(await status(2), /^Need \d+ more Flux\.$/);
-    assert.equal(await offer(2).isEnabled(), false);
-    assert.match(await panel.locator('[data-specialization="salvo"]').textContent(), /2 \/ 5/);
+    await press(node('salvo'));
+    assert.equal(await level('salvo'), '1 / 5', 'each rank requires a new deliberate pair of presses');
+    await press(node('salvo'));
+    assert.match(await instruction(), /^Need \d+ more Flux\.$/);
+    assert.equal(await level('salvo'), '2 / 5');
+    const remaining = await flux();
+    await press(node('salvo'));
+    await press(node('salvo'));
+    assert.equal(await flux(), remaining, 'reselecting a blocked upgrade must not spend Flux');
+    await press(node('interest'));
+    assert.equal(await link('salvo').count(), 0, 'choosing another basic upgrade changes the displayed path');
+    await press(node('overdrive'));
+    assert.equal(await link('salvo').getAttribute('data-owned'), '', 'revisiting a basic upgrade restores its earned connections');
     if (mobile) await press(panel.locator('[data-close-upgrade]'));
     const active = page.locator('[data-active="salvo"]');
     assert.equal(await active.isEnabled(), false);
@@ -145,7 +166,7 @@ async function scenario(base, mobile, offline = false) {
     await press(opponent);
     assert.equal(await page.locator('#portrait-map').textContent(), 'Opponent');
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} onboarding, pause, locking, purchase, Flux debit, ability states, restart and opponent view.`);
+    console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} tree order, single detail, two-step purchases, earned links, Flux debit, pause, slots, restart and opponent view.`);
   } finally {
     await page.close();
   }
@@ -202,12 +223,30 @@ async function verifyAiming(base) {
     await page.goto(base);
     await page.locator('#start').click();
     await page.evaluate(() => {
-      const match = window.aimingTestMatch;
-      match.players.human.energy = 100000;
-      match.buy('tower', 'overdrive');
-      for (let rank = 0; rank < 5; rank++) match.buyTier2('overdrive', 'salvo');
-      match.buyTier3('overdrive', 'orbitalBreach');
+      window.aimingTestMatch.players.human.energy = 100000;
     });
+
+    await page.locator('[data-group="2"]').click();
+    const root = page.locator('[data-node="overdrive"]');
+    await root.click();
+    await root.press('Enter');
+    assert.equal(await root.locator('small').textContent(), '1 / 9');
+    const salvo = page.locator('[data-node="salvo"]');
+    for (let rank = 0; rank < 5; rank++) {
+      await salvo.click();
+      await salvo.click();
+    }
+    const orbital = page.locator('[data-node="orbitalBreach"]');
+    const edge = page.locator('[data-link="orbitalBreach"]');
+    await orbital.click();
+    assert.equal(await edge.getAttribute('data-owned'), null);
+    assert.equal(await page.locator('[data-aim-ultimate="orbitalBreach"]').count(), 0);
+    await orbital.click();
+    assert.equal(await orbital.locator('small').textContent(), 'Unlocked');
+    assert.equal(await edge.getAttribute('data-owned'), '');
+    assert.notEqual(await edge.evaluate(link => getComputedStyle(link, '::before').boxShadow), 'none');
+    assert.equal(await page.locator('[data-link="conjunctionSpheres"]').getAttribute('data-owned'), null);
+    await capture(page, 'desktop-ultimate');
 
     const aim = page.locator('[data-aim-ultimate="orbitalBreach"]');
     const canvas = page.locator('#arena');
@@ -231,7 +270,7 @@ async function verifyAiming(base) {
     assert.match(await aim.textContent(), /Recharging/);
     const progress = await page.evaluate(() => window.aimingTestMatch.players.human.breachScars[0].progress);
     assert.equal(progress, .48, 'the cast must land at the selected track position');
-    console.log('PASS: targeted ability enters aim mode, preserves its charge on cancellation or off-track clicks, and fires at the selected track position.');
+    console.log('PASS: keyboard and Tier III purchases, exact Ultimate link, and targeted ability aim, cancel and cast.');
   } finally {
     await page.close();
   }

@@ -60,21 +60,30 @@
               <button type="button" data-group="1">Mutations</button>
               <button type="button" data-group="2">Support</button>
             </nav>
-            <section class="upgrade-section" aria-label="Basic upgrades">
-              <div class="upgrade-caption"><h3>Basic upgrades</h3><span data-group-hint></span></div>
-              <div class="upgrade-options" data-families></div>
-              <div data-base-offer></div>
+            <p class="mutation-hint" data-mutation-hint hidden>Mutations strengthen the Kethra you send against the bot.</p>
+            <section class="upgrade-tree" aria-label="Upgrade tree">
+              <section class="tree-row" data-tier="1" aria-label="Tier I · Basic upgrades">
+                <h3 class="tree-tier" aria-hidden="true">I</h3><div class="tree-nodes" data-families></div>
+              </section>
+              <div class="tree-links tree-links-specialization" data-specialization-links aria-hidden="true"></div>
+              <section class="tree-row" data-tier="2" aria-label="Tier II · Specializations">
+                <h3 class="tree-tier" aria-hidden="true">II</h3><div class="tree-nodes" data-specializations></div>
+              </section>
+              <div class="tree-links tree-links-ultimate" data-ultimate-links aria-hidden="true"></div>
+              <section class="tree-row" data-tier="3" aria-label="Tier III · Ultimates">
+                <h3 class="tree-tier" aria-hidden="true">III</h3><div class="tree-nodes" data-ultimates></div>
+              </section>
             </section>
-            <details class="upgrade-paths">
-              <summary>Specializations <span data-tier2-hint></span></summary>
-              <div class="upgrade-options" data-specializations></div>
-              <div data-upgrade-details></div>
-            </details>
-            <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
-            <div class="confirmation" data-confirmation hidden>
-              <p></p><button type="button" data-cancel-upgrade>Cancel</button><button type="button" data-confirm-upgrade>Confirm purchase</button>
-            </div>
-            <label class="upgrade-mobile confirm-preference"><input type="checkbox" data-confirm-preference checked> Confirm purchases</label>
+            <section class="upgrade-detail" id="upgrade-detail" aria-label="Selected upgrade">
+              <p class="upgrade-prompt" data-upgrade-prompt>Select an upgrade to see what it does.</p>
+              <div data-upgrade-details hidden>
+                <div class="upgrade-detail-title"><h3 data-upgrade-name></h3><span data-upgrade-kind></span></div>
+                <p id="selected-upgrade-description" data-upgrade-effect></p>
+                <details class="upgrade-numbers" hidden><summary>Details</summary><p></p></details>
+                <p class="upgrade-instruction" data-upgrade-instruction></p>
+              </div>
+              <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
+            </section>
           </section>
         </aside>
       </section>
