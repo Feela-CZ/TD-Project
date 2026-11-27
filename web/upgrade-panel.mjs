@@ -2,7 +2,7 @@ import { UPGRADE_GROUPS, TIER2_FAMILIES, TIER3_FAMILIES, TIER1_MAX_LEVEL, TIER2_
 import { upgradeCost, upgradeBlock } from './upgrade-state.mjs';
 import { BASIC_UPGRADES, UPGRADE_EFFECTS, ULTIMATE_DETAILS } from './upgrade-copy.mjs';
 
-const makeBasic = ([id]) => ({ id, label: BASIC_UPGRADES[id].name, tier: 1, max: TIER1_MAX_LEVEL });
+const makeBasic = ([id, label]) => ({ id, label, tier: 1, max: TIER1_MAX_LEVEL });
 const HOLD_DELAY = 550;
 const HOLD_TOLERANCE = 10;
 const TIER_LABELS = ['Tier I · Basic upgrade', 'Tier II · Specialization', 'Tier III · Ultimate'];
@@ -39,7 +39,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   let groupIndex = 0;
   let snapshot, running, drawnGroup, drawnRoot;
   let selected = null;
-  let armed = false;
   let hold = null;
   let suppressPointerClick = false;
   let descriptionTrigger = null;
@@ -138,7 +137,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
       const action = level ? 'upgrade' : 'unlock';
       const input = mobile.matches ? 'Tap' : 'Click';
       const price = priceLabel(offer);
-      message = armed ? `${input} again to ${action} · ${price}` : `${level ? 'Next rank' : 'Unlock'} · ${price}`;
+      message = `${input} to ${action} · ${price}`;
     }
     text(instruction, message);
     instruction.toggleAttribute('data-buyable', !reason);
@@ -153,14 +152,13 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
       const level = rank(offer);
       const reason = availability(offer, level);
       const isSelected = id === selected;
-      if (isSelected && reason) armed = false;
       if (button.getAttribute('aria-pressed') !== String(isSelected)) button.setAttribute('aria-pressed', String(isSelected));
       if (isSelected) button.setAttribute('aria-describedby', 'selected-upgrade-description');
       else button.removeAttribute('aria-describedby');
       button.toggleAttribute('data-tree-root', offer.tier === 1 && id === currentRoot());
       button.toggleAttribute('data-owned', level > 0);
       button.toggleAttribute('data-locked', !level && Boolean(reason));
-      button.toggleAttribute('data-ready', isSelected && armed && !reason);
+      button.toggleAttribute('data-ready', isSelected && !reason);
       const label = level === offer.max ? (offer.tier === 3 ? 'Unlocked' : 'Max rank')
         : level ? `${level} / ${offer.max}` : reason ? 'Locked' : priceLabel(offer);
       text(status, label);
@@ -173,7 +171,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   function clearSelection() {
     selected = null;
-    armed = false;
     prompt.hidden = false;
     detailBody.hidden = true;
     detail.removeAttribute('data-tier');
@@ -183,7 +180,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   function showDetail(offer) {
     const basic = BASIC_UPGRADES[offer.id];
     selected = offer.id;
-    armed = true;
     prompt.hidden = true;
     detailBody.hidden = false;
     detail.dataset.tier = offer.tier;
@@ -200,7 +196,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     const basic = BASIC_UPGRADES[offer.id];
     const mechanics = basic?.details ?? ULTIMATE_DETAILS[offer.id] ?? offer.detail;
     const active = offer.id === 'overdrive' || offer.kind === 'active';
-    const requirement = offer.tier === 2 ? `${BASIC_UPGRADES[currentRoot()].name} at rank 1`
+    const requirement = offer.tier === 2 ? `${nodes.get(currentRoot()).offer.label} at rank 1`
       : offer.tier === 3 ? `${nodes.get(offer.choice).offer.label} at rank ${TIER2_MAX_LEVEL}` : '';
     text(descriptionTier, TIER_LABELS[offer.tier - 1] + (active ? ' · Active' : ''));
     text(descriptionTitle, offer.label);
@@ -210,8 +206,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     descriptionRequirement.hidden = !requirement;
     description.dataset.tier = offer.tier;
     descriptionTrigger = trigger;
-    armed = false;
-    refresh(snapshot, running);
     description.showModal();
   }
 
@@ -269,7 +263,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     const previous = rank(offer);
     if (availability(offer, previous)) return;
     const price = priceLabel(offer);
-    armed = false;
     const error = purchase(offer.tier, currentRoot(), offer.id);
     const level = rank(offer);
     if (level === previous) {
@@ -294,14 +287,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     }
     const offer = nodes.get(button.dataset.node)?.offer;
     if (!offer) return;
-    if (selected === offer.id) {
-      if (availability(offer)) return;
-      if (armed) return buy(offer);
-      armed = true;
-      text(feedback, '');
-      refresh(snapshot, running);
-      return;
-    }
+    if (selected === offer.id) return buy(offer);
     if (offer.tier === 1) roots[groupIndex] = offer.id;
     showDetail(offer);
     refresh(snapshot, running);
@@ -326,7 +312,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   function layout() {
     close();
-    armed = false;
     (mobile.matches ? sheet : desktop).append(panel);
     if (snapshot) refresh(snapshot, running);
   }
@@ -338,10 +323,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     clearSelection();
   }
 
-  sheet.addEventListener('close', () => {
-    armed = false;
-    if (snapshot) refresh(snapshot, running);
-  });
+  sheet.addEventListener('close', cancelHold);
   mobile.addEventListener('change', layout);
   layout();
   return { open, close, refresh, reset };

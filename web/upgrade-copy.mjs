@@ -1,20 +1,20 @@
 export const BASIC_UPGRADES = {
-  damage: { name: 'Shot damage', effect: 'Each shot deals more damage.', details: '+5% base damage per rank, up to +45%. Every permanent upgrade also adds 1 flat damage.' },
-  attackSpeed: { name: 'Fire rate', effect: 'The cannon fires more often.', details: 'Raises the base fire rate from 1.00 to 1.60 shots per second.' },
-  crit: { name: 'Critical chance', effect: 'More shots deal critical damage.', details: 'Raises the base critical chance from 0% to 30%.' },
-  armor: { name: 'Kethra armor', effect: 'Kethra sent to the opposing fortress take less damage.', details: 'Applies to newly spawned Kethra. At rank 9, base armor reduces incoming shot damage by 15% before other bonuses.' },
-  speed: { name: 'Kethra speed', effect: 'Kethra sent to the opposing fortress move faster.', details: 'Applies to newly spawned Kethra. At rank 9, their base movement speed is 30% higher.' },
-  maxHp: { name: 'Kethra health', effect: 'Kethra sent to the opposing fortress gain health.', details: 'Applies to newly spawned Kethra. At rank 9, they have 30% more base health.' },
-  interest: { name: 'Flux interest', effect: 'Earn more interest on unspent Flux every 6 seconds.', details: 'The normal payout rises from 0.25% to 0.80% of your balance per tick. Fractions carry over until they add up to a whole Flux.' },
-  rewardFloor: { name: 'Kill rewards', effect: 'Kethra that survive several laps are worth more Flux when killed.', details: 'Each completed lap reduces the base reward by 25%. This upgrade raises the minimum from 2 Flux to 3 at ranks 1–3, 4 at ranks 4–6 and 5 at ranks 7–9.' },
-  overdrive: { name: 'Surge Core', effect: 'Unlock a button that makes the cannon fire faster and shoot extra rounds for 4 seconds.', details: 'At rank 1, each volley can hit 2 targets. At rank 9, it can hit up to 4 at 2.5× the normal firing rate. Recharges in 120 seconds.' }
+  damage: { effect: 'Each shot deals more damage.', details: '+5% base damage per rank, up to +45%. Every permanent upgrade also adds 1 flat damage.' },
+  attackSpeed: { effect: 'The cannon fires more often.', details: 'Raises the base fire rate from 1.00 to 1.60 shots per second.' },
+  crit: { effect: 'More shots deal critical damage.', details: 'Raises the base critical chance from 0% to 30%.' },
+  armor: { effect: 'Kethra sent to the opposing fortress take less damage.', details: 'Applies to newly spawned Kethra. At rank 9, base armor reduces incoming shot damage by 15% before other bonuses.' },
+  speed: { effect: 'Kethra sent to the opposing fortress move faster.', details: 'Applies to newly spawned Kethra. At rank 9, their base movement speed is 30% higher.' },
+  maxHp: { effect: 'Kethra sent to the opposing fortress gain health.', details: 'Applies to newly spawned Kethra. At rank 9, they have 30% more base health.' },
+  interest: { effect: 'Earn more interest on unspent Flux every 6 seconds.', details: 'The normal payout rises from 0.25% to 0.80% of your balance per tick. Fractions carry over until they add up to a whole Flux.' },
+  rewardFloor: { effect: 'Kethra that survive several laps are worth more Flux when killed.', details: 'Each completed lap reduces the base reward by 25%. This upgrade raises the minimum from 2 Flux to 3 at ranks 1–3, 4 at ranks 4–6 and 5 at ranks 7–9.' },
+  overdrive: { effect: 'Unlock a button that makes the cannon fire faster and shoot extra rounds for 4 seconds.', details: 'At rank 1, each volley can hit 2 targets. At rank 9, it can hit up to 4 at 2.5× the normal firing rate. Recharges in 120 seconds.' }
 };
 
 export const ULTIMATE_DETAILS = {
   vectorReversal: 'An extra Split Volley round pushes its target back by 5% of the track. The same target can be pushed once every 4 seconds.',
   cullingEdict: 'A surviving target has a 0.1% chance plus another 0.1 percentage points per 10% of health missing after the hit. Damage over time cannot trigger it.',
   bioTarHalo: 'Direct hits slow the target by 36% and nearby Kethra by 24% for 2 seconds. The halo reaches 3% of the track in either direction.',
-  funeralCircuit: 'With Critical chance as your other Cannon upgrade, killing critical hits are stronger and leftover damage can carry into up to three more targets.',
+  funeralCircuit: 'With Precision as your other Offense upgrade, killing critical hits are stronger and leftover damage can carry into up to three more targets.',
   thermalRupture: 'A direct shot that kills a burning target deals 75% of base shot damage to nearby Kethra. The burning area remains for 3 seconds.',
   overclockProtocol: 'Hits also build Combat Rhythm at one-third of the normal rate per shot.',
   focusCascade: 'The extra shots target up to five different Kethra in the firing zone. If there are fewer than five, the first target takes the remaining shots’ damage.',
@@ -35,7 +35,7 @@ export const ULTIMATE_DETAILS = {
   commandOverride: 'Prioritize enemies by completed laps or by lowest or highest current health. In manual mode, select an enemy on the battlefield.',
   signalCorruption: 'For 6 seconds, the opposing cannon switches targets when possible. Each attacking Kethra can redirect one lethal shot to an ally. Recharges in 70 seconds.',
   nullifyingPurge: 'Removes bonuses to health, armor and speed in the targeted area. Affected Kethra are slowed by 95% for 1.25 seconds. Recharges in 80 seconds.',
-  orbitalBreach: 'The first meteor lands after 0.65 seconds. Shot damage and Critical chance upgrades make it stronger. Fire rate can add follow-up meteors. Recharges in 75 seconds.',
+  orbitalBreach: 'The first meteor lands after 0.65 seconds. Ordnance and Precision make it stronger. Cadence can add follow-up meteors. Recharges in 75 seconds.',
   conjunctionSpheres: 'Choose the left or right side of the main firing zone. The cannon can attack both zones independently for 5 seconds. Recharges in 90 seconds.'
 };
 

@@ -34,8 +34,7 @@ export function createTurretMotion(tower = FORTRESS) {
     origins.clear();
   }
 
-  function update(time, activeId, rounds, pointFor, reduced = false) {
-    const activePoint = pointFor(activeId);
+  function update(time, { activeId = null, hasTargetInRange, rounds, pointFor, reduced = false }) {
     if (lastTime !== null && time < lastTime) reset();
     const elapsed = lastTime === null ? 0 : Math.min(.08, time - lastTime);
     lastTime = time;
@@ -67,10 +66,9 @@ export function createTurretMotion(tower = FORTRESS) {
     }
 
     const age = time - lastShotTime;
-    const atLaunch = age < FLASH_SECONDS;
-    if (!atLaunch && (activePoint || age > .5)) {
-      const desired = activePoint ? angleTo(pivot, activePoint) : REST_ANGLE;
-      const remaining = Math.atan2(Math.sin(desired - angle), Math.cos(desired - angle));
+    // Preserve the firing bearing while another shot is possible, even during cooldown.
+    if (!hasTargetInRange && age >= FLASH_SECONDS) {
+      const remaining = Math.atan2(Math.sin(REST_ANGLE - angle), Math.cos(REST_ANGLE - angle));
       const maxTurn = TURN_RATE * elapsed;
       angle += Math.max(-maxTurn, Math.min(maxTurn, remaining));
     }

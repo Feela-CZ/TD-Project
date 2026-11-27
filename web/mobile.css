@@ -6,10 +6,9 @@
   .match-settings > summary { padding: 10px 6px; font-size: .77rem; }
   .desktop-shell { display: block; }
   .right-panel,.left-panel { display: none; }
-  .game-stage { max-width: min(440px, max(270px, calc((100svh - 195px) * .60))); }
+  .game-stage { max-width: none; }
   .game-toolbar button,.field-actions button { min-height: 44px; padding: 6px; font-size: .81rem; }
   .game-toolbar [data-stats],.game-toolbar [data-rival] { display: block; }
-  canvas { touch-action: none; }
   .portrait-hud > div { padding: 6px; }
   .field-guide { font-size: .76rem; }
   .field-guide button { min-height: 44px; padding: 5px; }

@@ -56,7 +56,7 @@ async function holdUpgrade(page, node, dialog, mobile) {
 
 async function scenario(base, mobile, offline = false) {
   const page = await browser.newPage(mobile
-    ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }
+    ? { viewport: { width: 390, height: 667 }, hasTouch: true, isMobile: true }
     : { viewport: { width: 1440, height: 1000 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -95,6 +95,14 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await page.locator('#portrait-wave').textContent(), 'Wave 1 / 60');
     assert.equal(await page.locator('#strain-meter').getAttribute('max'), '100');
     assert.equal(await page.locator('[data-rival]').isVisible(), false);
+    if (mobile) {
+      const available = await page.locator('main').evaluate(main => {
+        const style = getComputedStyle(main);
+        return main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      });
+      const arena = await page.locator('.arena-wrap').boundingBox();
+      assert.ok(Math.abs(arena.width - available) < 1, 'the arena fills the usable phone width');
+    }
     if (!mobile && !offline) await capture(page, 'desktop');
 
     await press(upgrades);
@@ -108,6 +116,11 @@ async function scenario(base, mobile, offline = false) {
     const colors = await panel.locator('.tree-tier').evaluateAll(tiers => tiers.map(tier => getComputedStyle(tier).color));
     assert.equal(new Set(colors).size, 3, 'each tier must have a distinct color');
     assert.equal(await panel.locator('.tree-node').count(), 9);
+    assert.deepEqual(await panel.locator('[data-group]').allTextContents(), ['Offense', 'Mutation', 'Utility']);
+    assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Ordnance', 'Cadence', 'Precision']);
+    await press(panel.locator('[data-group="1"]'));
+    assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Carapace', 'Kinesis', 'Vital Mass']);
+    await press(panel.locator('[data-group="0"]'));
     assert.equal(await panel.locator('#upgrade-detail button').count(), 0, 'purchases take place on the tree itself');
     assert.equal(await panel.locator('[data-upgrade-details]').isVisible(), false);
     assert.match(await panel.locator('.upgrade-help').textContent(), /Hold an upgrade for details/);
@@ -115,7 +128,7 @@ async function scenario(base, mobile, offline = false) {
     assert.match(await panel.locator('[data-upgrade-effect]').textContent(), /Each shot deals more damage/);
     if (!mobile) {
       await node('damage').press('Shift+Enter');
-      assert.equal(await descriptionTitle.textContent(), 'Shot damage');
+      assert.equal(await descriptionTitle.textContent(), 'Ordnance');
       assert.match(await mechanics.textContent(), /\+5% base damage per rank/);
       assert.equal(await requirement.isVisible(), false);
       await page.keyboard.press('Escape');
@@ -123,6 +136,7 @@ async function scenario(base, mobile, offline = false) {
       await page.waitForFunction(() => document.activeElement.dataset.node === 'damage');
     }
     await press(panel.locator('[data-group="2"]'));
+    assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Reserves', 'Control Nexus', 'Surge Core']);
     await press(node('overdrive'));
     assert.equal(await instruction(), 'Start the match to buy upgrades.');
     await press(node('salvo'));
@@ -149,7 +163,7 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await page.locator('#incursion-next').textContent(), timer, 'pausing must freeze the next-wave timer');
     if (mobile) await press(upgrades);
     await press(node('overdrive'));
-    assert.match(await instruction(), /again to unlock · Free/);
+    assert.match(await instruction(), /to unlock · Free/);
     assert.equal(await level('overdrive'), 'Free', 'the first press must only select the upgrade');
     await press(node('overdrive'));
     assert.equal(await level('overdrive'), '1 / 9', 'players can plan and purchase while paused');
@@ -183,8 +197,6 @@ async function scenario(base, mobile, offline = false) {
     await description.waitFor({ state:'hidden' });
     if (mobile) assert.equal(await page.locator('#upgrade-sheet').isVisible(), true, 'closing details keeps the upgrade drawer open');
     await press(node('salvo'));
-    assert.equal(await flux(), before, 'closing the description leaves the purchase disarmed');
-    await press(node('salvo'));
     assert.equal(before - await flux(), 60, 'Saturation Burst must debit its displayed price');
     assert.equal(await level('salvo'), '1 / 5');
     assert.match(await feedback(), /Unlocked · 60 Flux/);
@@ -196,10 +208,9 @@ async function scenario(base, mobile, offline = false) {
     if (!offline) await capture(page, mobile ? 'mobile-upgrades' : 'desktop-upgrades');
 
     await press(node('salvo'));
-    assert.equal(await level('salvo'), '1 / 5', 'each rank requires a new deliberate pair of presses');
-    await press(node('salvo'));
     assert.match(await instruction(), /^Need \d+ more Flux\.$/);
-    assert.equal(await level('salvo'), '2 / 5');
+    assert.equal(await level('salvo'), '2 / 5', 'every additional tap buys the next rank');
+    assert.equal(before - await flux(), 128, 'each of the two ranks is charged exactly once');
     const remaining = await flux();
     await press(node('salvo'));
     await press(node('salvo'));
@@ -237,7 +248,7 @@ async function scenario(base, mobile, offline = false) {
     await press(opponent);
     assert.equal(await page.locator('#portrait-map').textContent(), 'Opponent');
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} upgrade tree, hold-to-read, two-step purchases, paid links, pause, restart and opponent view.`);
+    console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} upgrade tree, hold-to-read, consecutive rank purchases, paid links, pause, restart and opponent view.`);
   } finally {
     await page.close();
   }
@@ -329,9 +340,10 @@ async function verifyAiming(base) {
     await root.press('Enter');
     assert.equal(await root.locator('small').textContent(), '1 / 9');
     const salvo = page.locator('[data-node="salvo"]');
-    for (let rank = 0; rank < 5; rank++) {
+    await salvo.click();
+    for (let rank = 1; rank <= 5; rank++) {
       await salvo.click();
-      await salvo.click();
+      assert.equal(await salvo.locator('small').textContent(), rank === 5 ? 'Max rank' : rank + ' / 5');
     }
     const orbital = page.locator('[data-node="orbitalBreach"]');
     const edge = page.locator('[data-link="orbitalBreach"]');
