@@ -12,7 +12,7 @@ main {
 }
 .masthead { gap: 8px; margin: 0; padding: 0 0 var(--gap); }
 .masthead h1 { font-size: clamp(1.18rem, 3.7vmin, 2.55rem); }
-.subtitle { margin-top: 3px; font-size: clamp(.73rem, 1.9vmin, .91rem); }
+
 .masthead button { flex: none; }
 .desktop-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; align-items: stretch; gap: var(--gap); }
 .right-panel { display: none; }
@@ -41,8 +41,8 @@ main {
   width: min(100%, calc(100cqh * .6)); height: min(100%, calc(100cqw / .6));
   touch-action: none;
 }
-.field-guide { font-size: .76rem; }
-.field-guide button { min-height: 44px; padding: 5px; }
+
+
 .status {
   position: absolute; z-index: 3; inset: .4rem .45rem auto; margin: 0; pointer-events: none;
 }
@@ -83,9 +83,13 @@ main {
 #match-settings .mode { min-width: 0; }
 #match-settings select { width: 100%; min-width: 0; padding-inline: 5px; }
 #match-settings #restart { grid-column: 1 / -1; }
+.sound-setting {
+  grid-column: 1 / -1; display: flex; min-height: 38px; align-items: center; gap: 7px;
+  font-size: .9rem; color: var(--muted); cursor: pointer;
+}
+.sound-setting input { accent-color: var(--accent); width: 1.05rem; height: 1.05rem; }
 #match-overview .panel { padding: 8px; box-shadow: none; }
-#match-overview .panel > h3 { margin-bottom: 4px; }
-#match-overview .panel-note { margin-bottom: 3px; }
+
 #match-overview .metric-grid div { padding: 4px 0 2px; }
 [data-screen="match"], #recon { display: grid; gap: 5px; }
 #map-nav { gap: 5px; }
@@ -103,13 +107,13 @@ main {
 .upgrade-panel { padding: clamp(8px, 2vmin, 16px); }
 .upgrade-heading button, .upgrade-tabs button { min-height: 44px; }
 .upgrade-tabs { margin: 6px 0; }
-.mutation-hint { margin-bottom: 4px; }
+
 .upgrade-tree { --tree-gutter: 1.65rem; --tree-gap: 5px; }
 .tree-node { min-height: clamp(51px, 10dvh, 73px); padding: 4px 3px; gap: 3px; }
 .tree-links { height: clamp(8px, 2.5dvh, 20px); }
 .tree-links-specialization { height: clamp(10px, 3.3dvh, 27px); }
 .upgrade-detail { margin-top: 6px; padding: 7px; }
-.upgrade-help { margin-top: 5px; gap: 2px 6px; }
+
 .upgrade-description {
   width: min(100% - var(--dialog-left) - var(--dialog-right), 38rem);
   padding: clamp(9px, 2.4vmin, 21px);
@@ -131,15 +135,15 @@ main {
   .masthead { padding-bottom: 3px; }
   .masthead button { min-height: 34px; padding: 3px 8px; }
   .game-toolbar button { min-height: 39px; }
-  .field-guide { padding: 4px 6px; }
+
   .upgrade-sheet { width: min(100% - var(--dialog-left) - var(--dialog-right), 49rem); }
   .upgrade-sheet .upgrade-panel {
     display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); align-items: start; gap: 4px 8px;
   }
-  .upgrade-heading, .upgrade-tabs, .mutation-hint { grid-column: 1 / -1; }
-  .upgrade-tabs, .mutation-hint, .upgrade-detail, .upgrade-help { margin: 0; }
-  .upgrade-tree { grid-column: 1; grid-row: span 2; }
-  .upgrade-detail, .upgrade-help { grid-column: 2; }
+  .upgrade-heading, .upgrade-tabs { grid-column: 1 / -1; }
+  .upgrade-tabs, .upgrade-detail { margin: 0; }
+  .upgrade-tree { grid-column: 1; }
+  .upgrade-detail { grid-column: 2; }
   .upgrade-heading button, .upgrade-tabs button { min-height: 36px; padding-block: 3px; }
   .tree-node { min-height: 44px; font-size: .74rem; }
   .tree-links { height: 6px; }

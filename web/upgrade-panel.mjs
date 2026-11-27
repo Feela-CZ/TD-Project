@@ -9,7 +9,6 @@ const TIER_LABELS = ['Tier I · Basic upgrade', 'Tier II · Specialization', 'Ti
 
 export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const desktopLayout = matchMedia('(min-width: 1120px) and (min-height: 660px)');
-  const touch = matchMedia('(pointer: coarse)');
   const tree = panel.querySelector('.upgrade-tree');
   const families = panel.querySelector('[data-families]');
   const specializations = panel.querySelector('[data-specializations]');
@@ -19,14 +18,11 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const groupButtons = panel.querySelectorAll('[data-group]');
   const heading = panel.querySelector('[data-upgrade-heading]');
   const balance = panel.querySelector('[data-panel-flux]');
-  const mutationHint = panel.querySelector('[data-mutation-hint]');
   const detail = panel.querySelector('.upgrade-detail');
-  const prompt = detail.querySelector('[data-upgrade-prompt]');
-  const detailBody = detail.querySelector('[data-upgrade-details]');
   const name = detail.querySelector('[data-upgrade-name]');
   const kind = detail.querySelector('[data-upgrade-kind]');
   const effect = detail.querySelector('[data-upgrade-effect]');
-  const instruction = detail.querySelector('[data-upgrade-instruction]');
+  const cost = detail.querySelector('[data-upgrade-cost]');
   const feedback = detail.querySelector('[data-upgrade-feedback]');
   const description = panel.querySelector('#upgrade-description');
   const descriptionTitle = description.querySelector('#upgrade-description-title');
@@ -62,14 +58,14 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     return (offer.tier === 2 ? p.tier2 : p.tier3)[currentRoot()][offer.id];
   }
 
-  function availability(offer, level = rank(offer)) {
+  function availability(offer, level = rank(offer), active = running) {
     return upgradeBlock(snapshot, {
       tier: offer.tier,
       root: offer.tier === 1 ? offer.id : currentRoot(),
       choice: offer.choice,
       groupIndex,
       item: { ...offer, level },
-      running
+      running: active
     });
   }
 
@@ -113,7 +109,6 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
       basics = UPGRADE_GROUPS[groupIndex].nodes.map(makeBasic);
       buildNodes(families, basics);
       groupButtons.forEach((button, index) => button.setAttribute('aria-pressed', String(index === groupIndex)));
-      mutationHint.hidden = groupIndex !== 1;
     }
     if (drawnRoot === root) return;
     drawnRoot = root;
@@ -132,16 +127,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   }
 
   function updateDetail(offer, level, reason) {
-    let message = reason;
-    if (level === offer.max) message = '';
-    else if (!reason) {
-      const action = level ? 'upgrade' : 'unlock';
-      const input = touch.matches ? 'Tap' : 'Click';
-      const price = priceLabel(offer);
-      message = `${input} to ${action} · ${price}`;
-    }
-    text(instruction, message);
-    instruction.toggleAttribute('data-buyable', !reason);
+    text(cost, level === offer.max ? '' : reason || priceLabel(offer));
+    cost.toggleAttribute('data-buyable', !reason);
   }
 
   function refresh(nextSnapshot, active) {
@@ -151,7 +138,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     text(balance, `${Math.floor(player().energy)} Flux`);
     for (const [id, { button, status, offer }] of nodes) {
       const level = rank(offer);
-      const reason = availability(offer, level);
+      const reason = availability(offer, level, true);
       const isSelected = id === selected;
       if (button.getAttribute('aria-pressed') !== String(isSelected)) button.setAttribute('aria-pressed', String(isSelected));
       if (isSelected) button.setAttribute('aria-describedby', 'selected-upgrade-description');
@@ -159,7 +146,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
       button.toggleAttribute('data-tree-root', offer.tier === 1 && id === currentRoot());
       button.toggleAttribute('data-owned', level > 0);
       button.toggleAttribute('data-locked', !level && Boolean(reason));
-      button.toggleAttribute('data-ready', isSelected && !reason);
+      button.toggleAttribute('data-ready', isSelected && running && !reason);
       const label = level === offer.max ? (offer.tier === 3 ? 'Unlocked' : 'Max rank')
         : level ? `${level} / ${offer.max}` : reason ? 'Locked' : priceLabel(offer);
       text(status, label);
@@ -172,8 +159,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   function clearSelection() {
     selected = null;
-    prompt.hidden = false;
-    detailBody.hidden = true;
+    detail.hidden = true;
     detail.removeAttribute('data-tier');
     text(feedback, '');
   }
@@ -181,8 +167,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   function showDetail(offer) {
     const basic = BASIC_UPGRADES[offer.id];
     selected = offer.id;
-    prompt.hidden = true;
-    detailBody.hidden = false;
+    detail.hidden = false;
     detail.dataset.tier = offer.tier;
     text(name, offer.label);
     text(kind, offer.kind === 'active' || offer.id === 'overdrive' ? 'Active' : '');
@@ -190,8 +175,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     text(feedback, '');
   }
 
-  function openDescription(trigger) {
-    const offer = nodes.get(trigger.dataset.node)?.offer;
+  function openDescription(trigger, returnFocus = trigger) {
+    const offer = nodes.get(trigger?.dataset.node)?.offer;
     if (!offer || description.open) return;
     cancelHold();
     const basic = BASIC_UPGRADES[offer.id];
@@ -206,7 +191,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     text(descriptionRequirement, requirement && `Requires ${requirement}.`);
     descriptionRequirement.hidden = !requirement;
     description.dataset.tier = offer.tier;
-    descriptionTrigger = trigger;
+    descriptionTrigger = returnFocus;
     description.showModal();
   }
 
@@ -279,6 +264,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     const button = event.target.closest('button');
     if (!button) return;
     if (button.hasAttribute('data-close-upgrade')) return close();
+    if (button.hasAttribute('data-open-description')) return openDescription(nodes.get(selected)?.button, button);
     if (button.dataset.group !== undefined) {
       const index = Number(button.dataset.group);
       if (index === groupIndex) return;

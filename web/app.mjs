@@ -1,4 +1,5 @@
-import { BOT_PROFILES, LiveMatch, TIER2_MAX_LEVEL, TIER2_FAMILIES, TIER3_FAMILIES, killFluxForCreep, visualLaneForCreep } from '../dist/live.mjs';
+import { LiveMatch, TIER2_MAX_LEVEL, TIER2_FAMILIES, TIER3_FAMILIES, killFluxForCreep, visualLaneForCreep } from '../dist/live.mjs';
+import { createGameAudio } from './game-audio.mjs';
 import { createTouchUi } from './touch-ui.mjs';
 import { createUpgradePanel } from './upgrade-panel.mjs';
 import { createArenaArt } from './arena-art.mjs';
@@ -12,7 +13,8 @@ const restart = document.querySelector('#restart');
 const mode = document.querySelector('#mode');
 const botProfile = document.querySelector('#bot-profile');
 const botProfileLabel = document.querySelector('#bot-profile-label');
-const subtitle = document.querySelector('#subtitle');
+const soundSetting = document.querySelector('#sound-effects');
+const gameAudio = createGameAudio();
 const result = document.querySelector('#result');
 const recon = document.querySelector('#recon');
 const overview = document.querySelector('#match-overview');
@@ -24,13 +26,11 @@ const abilityMenu = document.querySelector('#ability-menu');
 const abilityButton = document.querySelector('[data-abilities]');
 const portraitMap = document.querySelector('#portrait-map');
 const portraitTempo = document.querySelector('#portrait-tempo');
-const fieldTip = document.querySelector('#field-tip');
 const aimCancel = document.querySelector('#cancel-aim');
 const arenaWrap = canvas.parentElement;
 const strainMeter = document.querySelector('#strain-meter');
 const waveTimer = document.querySelector('#incursion-next');
 const waveLabel = document.querySelector('#portrait-wave');
-const nextWaveLabel = document.querySelector('#next-wave-label');
 const fluxLabel = document.querySelector('#portrait-flux');
 const strainLabel = document.querySelector('#overload');
 const createMatch = () => new LiveMatch(undefined, mode.value === 'solo' ? { botEnabled: false, soloProgression: true } : { botProfile:botProfile.value });
@@ -82,10 +82,20 @@ function setMapView(view, snapshot = latestSnapshot ?? match.snapshot()) {
 function setModeUi() {
   const solo = mode.value === 'solo';
   botProfileLabel.hidden = solo;
-  subtitle.textContent = solo ? 'Solo · Defend your fortress' : `Versus bot · ${BOT_PROFILES[botProfile.value].label}`;
   mapNav.hidden = solo;
   stage.toggleAttribute('data-versus', !solo);
   if (solo) mapView = 'human';
+}
+
+soundSetting.checked = gameAudio.enabled;
+soundSetting.disabled = !gameAudio.available;
+soundSetting.addEventListener('change', () => gameAudio.setEnabled(soundSetting.checked));
+
+function startAudio(announceWave) {
+  const activeMatch = match;
+  void gameAudio.unlock().then(ready => {
+    if (ready && announceWave && match === activeMatch && running && !paused) gameAudio.play('wave');
+  });
 }
 
 function resetMatch(active = false) {
@@ -100,6 +110,7 @@ function resetMatch(active = false) {
   upgradePanel.reset();
   for (const motion of Object.values(turrets)) motion.reset();
   render(match.snapshot());
+  if (active) startAudio(true);
 }
 mode.addEventListener('change', () => { setModeUi(); resetMatch(); });
 botProfile.addEventListener('change', () => { if (mode.value === 'versus') { setModeUi(); resetMatch(); } });
@@ -108,8 +119,10 @@ start.addEventListener('click', () => {
     resetMatch(true);
     return;
   }
+  const starting = !running;
   paused = running && !paused;
   running = true;
+  if (!paused) startAudio(starting);
   if (paused) aim = null;
   showStatus('');
   render(match.snapshot());
@@ -152,8 +165,11 @@ function finishAim(cast) {
   const id = aim;
   aim = null;
   if (cast) {
+    const before = latestSnapshot.players.human.ultimateCooldowns[id];
     match.activateUltimate(id, trackPosition);
-    showStatus(match.snapshot().message);
+    const snapshot = match.snapshot();
+    if (snapshot.players.human.ultimateCooldowns[id] > before) gameAudio.play('ability');
+    showStatus(snapshot.message);
   } else showStatus('');
   render(match.snapshot());
   abilityButton.focus({ preventScroll: true });
@@ -198,7 +214,7 @@ canvas.addEventListener('pointerup', event => {
   if (aim) {
     aimAt(point);
     if (trackMarkerVisible) finishAim(true);
-    else showStatus('Choose a point on the track.');
+    else showStatus('Off track');
     return;
   }
   const player = latestSnapshot.players.human;
@@ -209,7 +225,6 @@ canvas.addEventListener('pointerup', event => {
     }).sort((a, b) => a.distance - b.distance)[0];
     if (nearest && nearest.distance < 24) {
       match.setManualTarget(nearest.creep.id);
-      showStatus('Target selected.');
       render(match.snapshot());
       return;
     }
@@ -308,7 +323,7 @@ function drawSide(player, side, color, visible) {
     pointFor: id => points.get(id),
     reduced: reduceMotion.matches
   });
-  arenaArt.drawTower(color, side === 'human' ? 'YOUR FORTRESS' : 'RIVAL FORTRESS', pose);
+  arenaArt.drawTower(color, pose);
   if (!visible) return;
   for (const creep of player.creeps) { const point = points.get(creep.id); const hp = Math.max(0, creep.hp / creep.maxHp), radius=(creep.form?.includes('abomination')?18:creep.form?.includes('chimera')?12:creep.form==='fragment'?4:creep.form==='shard'?5:creep.form==='brood'?5:7)+(creep.boss?3:0); if (creep.slowUntil > snapshotTime) { context.strokeStyle = '#6ce5ff'; context.lineWidth = 2; context.shadowColor='#6ce5ff'; context.shadowBlur=8; context.beginPath(); context.arc(point.x, point.y + 5, radius+3, 0, Math.PI * 2); context.stroke(); context.shadowBlur=0; } if (creep.safeToken && creep.safeUntil > snapshotTime) { context.strokeStyle='#f7dc6f'; context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,radius+6,0,Math.PI*2); context.stroke(); } if (creep.chrysalisUntil > snapshotTime) { context.fillStyle='#c891ff77'; context.beginPath(); context.ellipse(point.x,point.y,radius+4,radius+8,0,0,Math.PI*2); context.fill(); } if (creep.burn) { context.fillStyle = '#ff8e46'; context.shadowColor='#ff5d3e'; context.shadowBlur=9; context.beginPath(); context.arc(point.x + radius*.7, point.y - radius, 3 + Math.sin(snapshotTime * 16 + creep.id), 0, Math.PI * 2); context.fill(); context.shadowBlur=0; } const baseColor = creep.boss?'#f3ad4f':creep.form?.includes('abomination')?'#b94c75':creep.form?.includes('chimera')?'#c47dff':creep.form==='fragment'?'#8bf2db':creepColor(creep, player); drawKethra(creep, point, radius, baseColor); drawEnemyHealth(point, radius, hp); }
   for (const projectile of player.projectiles) {
@@ -356,12 +371,13 @@ function drawCritFloats(snapshot) {
 function drawFogOverlay(reconLevel, opponent) {
   const fog = context.createRadialGradient(210, 355, 30, 210, 355, 330); fog.addColorStop(0, '#0a1020b8'); fog.addColorStop(1, '#03060eea'); context.fillStyle = fog; context.fillRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#d5def3'; context.font = '800 20px system-ui'; context.textAlign = 'center'; context.fillText('FOG OF WAR', 210, 338);
-  context.fillStyle = '#97a8cc'; context.font = '600 11px system-ui';
-  const message = reconLevel >= 4 ? 'Live composition and cooldown telemetry available.' : reconLevel >= 3 ? 'Tier II telemetry available.' : reconLevel >= 2 ? 'Tier I telemetry available.' : reconLevel > 0 ? `Core Strain ${opponent.load} / ${opponent.overloadCap}` : 'Opponent Kethra, upgrades and economy are concealed.';
-  context.fillText(reconLevel ? `Spectral Relay: ${message}` : message, 210, 362);
-  context.fillText(reconLevel ? `Upgrade to rank ${TIER2_MAX_LEVEL} for full reconnaissance.` : 'Spectral Relay rank 1 reveals purchases and Core Strain.', 210, 382);
+  if (reconLevel > 0) {
+    context.fillStyle = '#97a8cc';
+    context.font = '600 11px system-ui';
+    context.fillText(`Core strain ${opponent.load} / ${opponent.overloadCap}`, 210, 362);
+  }
 }
-const priorities = { default: 'Automatic', veteran: 'Most laps', lowest: 'Lowest health', highest: 'Highest health', manual: 'Pick an enemy' };
+const priorities = { default: 'Automatic', veteran: 'Most laps', lowest: 'Lowest health', highest: 'Highest health', manual: 'Manual' };
 const contracts = { chimera: ['Chimera', 90], abomination: ['Abomination', 180], hp: ['+20% health', 55], armor: ['+2 armor', 55], speed: ['+15% speed', 55] };
 let abilityLayout = '';
 let abilityPage = 0;
@@ -411,11 +427,11 @@ function renderActionDock(snapshot) {
   if (layout !== abilityLayout) {
     abilityLayout = layout;
     const pages = [];
-    addPages(pages, 'Combat abilities', quick.map(item =>
+    addPages(pages, 'Combat', quick.map(item =>
       `<button type="button" data-${item.attribute}="${item.id}"${item.side ? ` data-side="${item.side}"` : ''}><span>${item.name}</span><small></small></button>`));
     if (targeting) addPages(pages, 'Target priority', Object.entries(priorities).map(([id, label]) =>
       `<button type="button" data-priority="${id}">${label}</button>`));
-    if (bioforge) addPages(pages, 'Bioforge · Next available wave', Object.entries(contracts).map(([id, [label, cost]]) =>
+    if (bioforge) addPages(pages, 'Bioforge', Object.entries(contracts).map(([id, [label, cost]]) =>
       `<button type="button" data-bioforge="${id}">${label} · ${cost} Flux</button>`));
     actionDock.innerHTML = pages.map(({ title, items }) =>
       `<section class="ability-page"><h3>${title}</h3><div>${items.join('')}</div></section>`).join('');
@@ -446,6 +462,7 @@ actionDock.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (!button || !running || paused) return;
   const { action, active, priority, bioforge, aimUltimate, ultimate, side } = button.dataset;
+  const before = latestSnapshot.players.human;
   if (aimUltimate && aim === aimUltimate) return finishAim(false);
   aim = null;
   if (action === 'overdrive') match.activateOverdrive();
@@ -465,6 +482,13 @@ actionDock.addEventListener('click', event => {
   } else if (ultimate) match.activateUltimate(ultimate, .5, side ?? 'left');
   abilityMenu.close();
   const snapshot = match.snapshot();
+  const after = snapshot.players.human;
+  if ((action && after.overdriveCooldown > before.overdriveCooldown) ||
+      (active && after.activeCooldowns[active] > before.activeCooldowns[active]) ||
+      (ultimate && after.ultimateCooldowns[ultimate] > before.ultimateCooldowns[ultimate])) {
+    gameAudio.play('ability');
+  }
+  if (bioforge && after.energy < before.energy) gameAudio.play('purchase');
   showStatus(priority ? `Target priority · ${priorities[priority]}` : snapshot.message);
   render(snapshot);
 });
@@ -474,28 +498,27 @@ function openUpgrades() {
   upgradePanel.open();
 }
 
-function renderFieldControls(snapshot, opponentView) {
+function renderFieldControls(snapshot) {
   const human = snapshot.players.human;
   setText(start, snapshot.result ? 'Play again' : running ? paused ? 'Resume' : 'Pause' : 'Start match');
   start.classList.toggle('primary', !running || paused);
   setText(fluxLabel, String(Math.floor(human.energy)));
   setText(waveLabel, `Wave ${snapshot.wave} / ${snapshot.maxWaves}${snapshot.wave % 5 === 0 ? ' · Boss' : ''}`);
   const finalWave = snapshot.wave === snapshot.maxWaves;
-  setText(waveTimer, finalWave ? 'Final wave' : `${Math.ceil(snapshot.nextIncursionIn)}s`);
-  nextWaveLabel.hidden = finalWave;
+  const seconds = Math.ceil(snapshot.nextIncursionIn);
+  const waveTime = finalWave ? 'Final wave' : `${seconds}s`;
+  if (waveTimer.textContent !== waveTime) {
+    setText(waveTimer, waveTime);
+    waveTimer.setAttribute('aria-label', finalWave ? 'Final wave' : `Next wave in ${seconds} seconds`);
+  }
   setText(strainLabel, `${human.load} / ${human.overloadCap}`);
   strainMeter.max = human.overloadCap;
   strainMeter.value = human.load;
   strainMeter.classList.toggle('danger', human.load / human.overloadCap >= .75);
   arenaWrap.classList.toggle('aiming', Boolean(aim));
   aimCancel.hidden = !aim;
-  if (aim) setText(fieldTip, `${ultimateLabels[aim]}: pick a spot on the track. Arrow keys to aim, Enter to fire.`);
-  else if (paused) setText(fieldTip, 'Paused. You can still buy upgrades.');
-  else if (opponentView) setText(fieldTip, 'Opponent battlefield.');
-  else if (!running) setText(fieldTip, 'Your cannon fires on its own. Spend Flux to upgrade it.');
-  else if (human.priorityMode === 'manual') setText(fieldTip, 'Manual aim: select an enemy on the track.');
-  else setText(fieldTip, '');
-  fieldTip.parentElement.hidden = !fieldTip.textContent;
+  const arenaLabel = aim ? `Aim ${ultimateLabels[aim]}` : 'Fortress battlefield';
+  if (canvas.getAttribute('aria-label') !== arenaLabel) canvas.setAttribute('aria-label', arenaLabel);
 
   portraitTempo.hidden = mode.value !== 'versus' || (!human.tempoCharge && !human.tempoQueued);
   portraitTempo.disabled = !running || paused || !human.tempoCharge || human.tempoQueued;
@@ -590,7 +613,7 @@ function render(snapshot) {
   document.querySelector('#combat-damage').textContent = human.combat.damage.join('–'); document.querySelector('#combat-speed').textContent = `${human.combat.attackRate.toFixed(2)} / s`; document.querySelector('#combat-crit').textContent = `${(human.combat.criticalChance * 100).toFixed(1)}%`; document.querySelector('#combat-multiplier').textContent = typeof human.combat.criticalMultiplier === 'number' ? `${human.combat.criticalMultiplier}×` : human.combat.criticalMultiplier;
   const versus = mode.value === 'versus'; document.querySelectorAll('[data-bot-strain]').forEach((element) => { element.hidden = !versus || reconLevel < 1; }); document.querySelectorAll('[data-bot-economy]').forEach((element) => { element.hidden = !versus || reconLevel < TIER2_MAX_LEVEL; }); portraitMap.disabled = !versus; portraitMap.textContent = opponentView ? 'Your fortress' : 'Opponent';
   if (versus && reconLevel && overview.open && !recon.hidden) renderRecon(bot, reconLevel);
-  renderFieldControls(snapshot, opponentView);
+  renderFieldControls(snapshot);
   upgradePanel.refresh(snapshot, running);
   renderActionDock(snapshot);
   touchUi.refresh(versus, opponentView, versus && reconLevel > 0);
@@ -601,6 +624,8 @@ function frame(now) {
     const elapsed = previous ? (now - previous) / 1000 : 0;
     match.step(elapsed);
     const snapshot = match.snapshot();
+    if (snapshot.wave > latestSnapshot.wave) gameAudio.play('wave');
+    if (snapshot.players.human.shots > latestSnapshot.players.human.shots) gameAudio.play('cannon');
     if (snapshot.result) {
       running = false;
       aim = null;
@@ -620,9 +645,12 @@ const upgradePanel = createUpgradePanel({
   sheet: document.querySelector('#upgrade-sheet'),
   desktop: document.querySelector('.right-panel'),
   purchase(tier, root, id) {
+    const player = match.players.human;
+    const previousPurchase = player.purchaseLog.at(-1);
     if (tier === 1) match.buy(root in match.players.human.tower ? 'tower' : 'mutation', root);
     else if (tier === 2) match.buyTier2(root, id);
     else match.buyTier3(root, id);
+    if (player.purchaseLog.at(-1) !== previousPurchase) gameAudio.play('purchase');
     const snapshot = match.snapshot();
     render(snapshot);
     return snapshot.message;

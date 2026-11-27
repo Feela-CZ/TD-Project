@@ -152,7 +152,7 @@ export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
     }
   }
 
-  function drawTower(color, label, pose) {
+  function drawTower(color, pose) {
     const { x, y } = pose.pivot;
     const spritesReady = fortressAtlas.complete && fortressAtlas.naturalWidth > 0;
 
@@ -194,12 +194,6 @@ export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
 
     if (pose.effect) drawMuzzleEffect(pose.effect, color);
 
-    ctx.save();
-    ctx.fillStyle = '#f7e8c5';
-    ctx.font = '700 9px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, x, y + 66);
-    ctx.restore();
   }
 
   function drawMuzzleEffect({ muzzle, flashPoint, angle, flash, sparkAge, hotShot }, color) {

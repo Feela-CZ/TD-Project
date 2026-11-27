@@ -73,7 +73,8 @@ async function scenario(base, mobile, offline = false) {
   const feedback = () => panel.locator('[data-upgrade-feedback]').textContent();
   const node = id => panel.locator(`[data-node="${id}"]`);
   const link = id => panel.locator(`[data-link="${id}"]`);
-  const instruction = () => panel.locator('[data-upgrade-instruction]').textContent();
+  const cost = () => panel.locator('[data-upgrade-cost]').textContent();
+  const tones = () => page.evaluate(() => window.toneStarts);
   const name = () => panel.locator('[data-upgrade-name]').textContent();
   const level = id => node(id).locator('small').textContent();
   const start = page.locator('#start');
@@ -84,6 +85,14 @@ async function scenario(base, mobile, offline = false) {
   const requirement = description.locator('[data-description-requirement]');
 
   try {
+    await page.addInitScript(() => {
+      window.toneStarts = 0;
+      const startTone = OscillatorNode.prototype.start;
+      OscillatorNode.prototype.start = function (...args) {
+        window.toneStarts++;
+        return startTone.apply(this, args);
+      };
+    });
     await page.clock.install();
     await page.goto(base);
     if (!offline) assert.equal(new URL(page.url()).pathname, '/web/', 'the advertised root must land in the running game');
@@ -93,7 +102,8 @@ async function scenario(base, mobile, offline = false) {
     }, offline);
     await start.waitFor();
     assert.equal(await flux(), 150);
-    assert.match(await page.locator('#field-tip').textContent(), /cannon fires on its own/);
+    assert.equal(await page.locator('#field-tip').count(), 0, 'the battlefield must be clear of tutorial copy');
+    assert.equal(await tones(), 0, 'audio must await a player gesture');
     assert.equal(await page.locator('#portrait-wave').textContent(), 'Wave 1 / 60');
     assert.equal(await page.locator('#strain-meter').getAttribute('max'), '100');
     assert.equal(await page.locator('[data-rival]').isVisible(), false);
@@ -123,11 +133,17 @@ async function scenario(base, mobile, offline = false) {
     await press(panel.locator('[data-group="1"]'));
     assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Carapace', 'Kinesis', 'Vital Mass']);
     await press(panel.locator('[data-group="0"]'));
-    assert.equal(await panel.locator('#upgrade-detail button').count(), 0, 'purchases take place on the tree itself');
-    assert.equal(await panel.locator('[data-upgrade-details]').isVisible(), false);
-    assert.match(await panel.locator('.upgrade-help').textContent(), /Hold an upgrade for details/);
+    assert.equal(await panel.locator('#upgrade-detail').isVisible(), false);
+    assert.equal(await panel.locator('.upgrade-help').count(), 0);
     await press(node('damage'));
     assert.match(await panel.locator('[data-upgrade-effect]').textContent(), /Each shot deals more damage/);
+    const detailsButton = panel.locator('[data-open-description]');
+    await press(detailsButton);
+    assert.equal(await descriptionTitle.textContent(), 'Ordnance');
+    assert.match(await mechanics.textContent(), /\+5% base damage per rank/);
+    await press(description.locator('[data-close-description]'));
+    await description.waitFor({ state:'hidden' });
+    await page.waitForFunction(() => document.activeElement.hasAttribute('data-open-description'));
     if (!mobile) {
       await node('damage').press('Shift+Enter');
       assert.equal(await descriptionTitle.textContent(), 'Ordnance');
@@ -140,12 +156,15 @@ async function scenario(base, mobile, offline = false) {
     await press(panel.locator('[data-group="2"]'));
     assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Reserves', 'Control Nexus', 'Surge Core']);
     await press(node('overdrive'));
-    assert.equal(await instruction(), 'Start the match to buy upgrades.');
+    assert.equal(await cost(), 'Free');
+    await press(node('overdrive'));
+    assert.equal(await level('overdrive'), 'Free', 'show the price before the match without buying');
+    assert.equal(await tones(), 0, 'selecting or trying an upgrade before the match stays silent');
     await press(node('salvo'));
-    assert.equal(await instruction(), 'Unlock the basic upgrade first.');
+    assert.equal(await cost(), 'Unlock the basic upgrade first.');
     await press(node('orbitalBreach'));
     assert.equal(await name(), 'Orbital Breach');
-    assert.equal(await instruction(), 'Reach rank 5 in this specialization first.');
+    assert.equal(await cost(), 'Reach rank 5 in this specialization first.');
     assert.equal(await panel.locator('.tree-node[aria-pressed="true"]').count(), 1);
     assert.equal(await panel.locator('[data-link][data-owned]').count(), 0);
     await holdUpgrade(page, node('orbitalBreach'), description, mobile);
@@ -157,17 +176,19 @@ async function scenario(base, mobile, offline = false) {
 
     await press(start);
     assert.equal(await start.textContent(), 'Pause');
+    await page.waitForFunction(() => window.toneStarts === 2);
     await press(start);
     assert.equal(await start.textContent(), 'Resume');
-    assert.match(await page.locator('#field-tip').textContent(), /Paused/);
     const timer = await page.locator('#incursion-next').textContent();
     await page.clock.fastForward(10_000);
     assert.equal(await page.locator('#incursion-next').textContent(), timer, 'pausing must freeze the next-wave timer');
     if (mobile) await press(upgrades);
     await press(node('overdrive'));
-    assert.match(await instruction(), /to unlock · Free/);
+    assert.equal(await cost(), 'Free');
     assert.equal(await level('overdrive'), 'Free', 'the first press must only select the upgrade');
+    const beforePurchaseCue = await tones();
     await press(node('overdrive'));
+    assert.equal(await tones(), beforePurchaseCue + 2, 'successful purchases play the confirmation sound');
     assert.equal(await level('overdrive'), '1 / 9', 'players can plan and purchase while paused');
     assert.match(await feedback(), /Unlocked · Free/);
     assert.equal(await level('salvo'), '60 Flux');
@@ -210,12 +231,14 @@ async function scenario(base, mobile, offline = false) {
     if (!offline) await capture(page, mobile ? 'mobile-upgrades' : 'desktop-upgrades');
 
     await press(node('salvo'));
-    assert.match(await instruction(), /^Need \d+ more Flux\.$/);
+    assert.match(await cost(), /^Need \d+ more Flux\.$/);
     assert.equal(await level('salvo'), '2 / 5', 'every additional tap buys the next rank');
     assert.equal(before - await flux(), 128, 'each of the two ranks is charged exactly once');
     const remaining = await flux();
+    const beforeBlockedCue = await tones();
     await press(node('salvo'));
     await press(node('salvo'));
+    assert.equal(await tones(), beforeBlockedCue, 'blocked purchases stay silent');
     assert.equal(await flux(), remaining, 'reselecting a blocked upgrade must not spend Flux');
     await press(node('interest'));
     assert.equal(await link('salvo').count(), 0, 'choosing another basic upgrade changes the displayed path');
@@ -228,9 +251,18 @@ async function scenario(base, mobile, offline = false) {
     assert.match(await active.textContent(), /Ready/);
     if (mobile) await capture(page, 'mobile');
     await press(page.locator('[data-abilities]'));
+    const beforeAbilityCue = await tones();
     await press(active);
+    assert.equal(await tones(), beforeAbilityCue + 2, 'a fired ability has its own sound');
     assert.match(await active.textContent(), /Recharging · 4[78] s/);
     assert.equal(await active.isEnabled(), false);
+    await press(page.locator('[data-open-dialog="match-settings"]'));
+    const sound = page.locator('#sound-effects');
+    assert.equal(await sound.isChecked(), true);
+    await press(sound);
+    assert.equal(await sound.isChecked(), false);
+    await press(page.locator('#match-settings [data-close-dialog]'));
+    const mutedTones = await tones();
     if (mobile) {
       await press(page.locator('[data-stats]'));
       await press(page.locator('[data-view="match"]'));
@@ -240,6 +272,7 @@ async function scenario(base, mobile, offline = false) {
       await press(page.locator('#restart'));
     }
     assert.equal(await flux(), 150);
+    assert.equal(await tones(), mutedTones, 'restarting a muted match plays no cue');
     assert.equal(await active.count(), 0, 'restart must reset a purchased ability');
 
     await press(page.locator('[data-open-dialog="match-settings"]'));
@@ -251,6 +284,11 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await page.locator('#portrait-map').textContent(), 'Your fortress');
     await press(opponent);
     assert.equal(await page.locator('#portrait-map').textContent(), 'Opponent');
+    if (!offline) {
+      await page.reload();
+      await press(page.locator('[data-open-dialog="match-settings"]'));
+      assert.equal(await sound.isChecked(), false, 'the sound setting persists across reload');
+    }
     assert.deepEqual(errors, []);
     console.log(`PASS: ${offline ? 'offline' : mobile ? 'touch' : 'desktop'} upgrade tree, hold-to-read, consecutive rank purchases, paid links, pause, restart and opponent view.`);
   } finally {
@@ -263,6 +301,12 @@ async function verifyTurretArt(base) {
   try {
     await page.addInitScript(() => {
       window.muzzleFlashes = [];
+      window.shotSounds = 0;
+      const playBuffer = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        window.shotSounds++;
+        return playBuffer.apply(this, args);
+      };
       let fortressFrame;
       const drawImage = CanvasRenderingContext2D.prototype.drawImage;
       CanvasRenderingContext2D.prototype.drawImage = function (source, ...args) {
@@ -305,6 +349,7 @@ async function verifyTurretArt(base) {
       flashes = await page.evaluate(() => window.muzzleFlashes);
     }
     assert.ok(flashes.length, 'the real match must draw its first muzzle flash');
+    assert.ok(await page.evaluate(() => window.shotSounds > 0), 'the real cannon shot must play a sound');
     const flash = flashes[0];
     assert.ok(Math.abs(flash.x - 210) > 3, 'the cannon must turn off its idle bearing on the first shot');
     assert.ok(flash.y < 575 && Math.sin(flash.angle) < 0, 'the muzzle points toward the actual firing sector');
@@ -367,7 +412,7 @@ async function verifyAiming(base) {
     await page.locator('[data-abilities]').click();
     await aim.click();
     await cancel.waitFor();
-    assert.match(await page.locator('#field-tip').textContent(), /pick a spot on the track/i);
+    assert.equal(await canvas.getAttribute('aria-label'), 'Aim Orbital Breach');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'arena');
     await page.keyboard.press('Escape');
     assert.equal(await cancel.isVisible(), false);
@@ -437,7 +482,9 @@ async function verifyFixedViewports(base) {
       assert.ok(Math.abs(field.width / field.height - .6) < .02, 'displayed arena must keep the portrait proportions');
       await arena.click({ position: { x: field.width * FORTRESS.x / world.width, y: field.height * FORTRESS.y / world.height } });
       if (width < 1120 || height < 660) await page.locator('#upgrade-sheet[open]').waitFor();
-      await checkFit('upgrades', ['#upgrade-panel', '.upgrade-tree', '.upgrade-detail']);
+      await checkFit('upgrades', ['#upgrade-panel', '.upgrade-tree']);
+      await page.locator('[data-node="damage"]').click();
+      await checkFit('selected upgrade', ['#upgrade-panel', '.upgrade-tree', '.upgrade-detail']);
       for (const branch of [1, 2, 0]) {
         await page.locator(`[data-group="${branch}"]`).click();
         await checkFit('upgrade branch', ['#upgrade-panel', '.upgrade-tree']);
@@ -465,7 +512,7 @@ async function verifyFixedViewports(base) {
       await page.keyboard.press('Escape');
       await page.locator('[data-open-dialog="match-settings"]').click();
       await page.locator('#mode').selectOption('versus');
-      await checkFit('versus settings', ['#match-settings', '#bot-profile', '#restart']);
+      await checkFit('versus settings', ['#match-settings', '#bot-profile', '#sound-effects', '#restart']);
       await page.keyboard.press('Escape');
       await checkFit('versus battlefield', ['main', '#arena', '[data-rival]']);
     } finally {
