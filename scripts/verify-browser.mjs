@@ -61,7 +61,7 @@ async function scenario(base, mobile, offline = false) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => {
-    if (response.status() >= 400 && /\.(?:mjs|css)$/.test(new URL(response.url()).pathname)) errors.push(response.url());
+    if (response.status() >= 400 && /\.(?:mjs|css|webp)$/.test(new URL(response.url()).pathname)) errors.push(response.url());
   });
   if (offline) page.on('request', request => { if (/^https?:/.test(request.url())) errors.push(request.url()); });
   page.setDefaultTimeout(6000);
@@ -85,6 +85,10 @@ async function scenario(base, mobile, offline = false) {
     await page.clock.install();
     await page.goto(base);
     if (!offline) assert.equal(new URL(page.url()).pathname, '/web/', 'the advertised root must land in the running game');
+    await page.waitForFunction(standalone => {
+      const atlas = document.querySelector('#fortress-atlas');
+      return atlas?.naturalWidth > 0 && (!standalone || atlas.src.startsWith('data:image/webp;'));
+    }, offline);
     await start.waitFor();
     assert.equal(await flux(), 150);
     assert.match(await page.locator('#field-tip').textContent(), /cannon fires on its own/);
@@ -244,17 +248,38 @@ async function verifyTurretArt(base) {
   try {
     await page.addInitScript(() => {
       window.muzzleFlashes = [];
+      let fortressFrame;
+      const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage = function (source, ...args) {
+        if (this.canvas.id === 'arena' && source.id === 'fortress-atlas' && args.length === 8) {
+          const [tileX, , , tileHeight, x, y, width, height] = args;
+          const matrix = this.getTransform();
+          const angle = Math.atan2(-matrix.d, -matrix.c);
+          if (tileX === 0) {
+            fortressFrame = { foundation: [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f] };
+          } else if (tileX === 450) {
+            const tip = new DOMPoint(x + width / 2, y + 6 * height / tileHeight).matrixTransform(matrix);
+            fortressFrame.barrel = { angle, x: tip.x, y: tip.y };
+          } else if (tileX === 294) {
+            fortressFrame.turret = angle;
+            window.fortressFrame = fortressFrame;
+          }
+        }
+        return drawImage.call(this, source, ...args);
+      };
       const original = CanvasRenderingContext2D.prototype.createRadialGradient;
       CanvasRenderingContext2D.prototype.createRadialGradient = function (...args) {
         if (this.canvas.id === 'arena' && args.slice(0,5).every(value => value === 0) && args[5] > 12 && args[5] <= 20) {
           const aim = this.getTransform();
-          window.muzzleFlashes.push({ x:aim.e, y:aim.f, angle:Math.atan2(aim.b,aim.a) });
+          window.muzzleFlashes.push({ x:aim.e, y:aim.f, angle:Math.atan2(aim.b,aim.a), sprites: fortressFrame });
         }
         return original.apply(this, args);
       };
     });
     await page.clock.install();
     await page.goto(base);
+    await page.waitForFunction(() => window.fortressFrame?.barrel);
+    const idle = await page.evaluate(() => window.fortressFrame);
     await page.locator('#start').click();
     const now = await page.evaluate(() => Date.now());
     await page.clock.pauseAt(now + 500);
@@ -268,8 +293,13 @@ async function verifyTurretArt(base) {
     const flash = flashes[0];
     assert.ok(Math.abs(flash.x - 210) > 3, 'the cannon must turn off its idle bearing on the first shot');
     assert.ok(flash.y < 575 && Math.sin(flash.angle) < 0, 'the muzzle points toward the actual firing sector');
+    assert.deepEqual(flash.sprites.foundation, idle.foundation, 'the foundation must stay in place');
+    assert.ok(Math.abs(flash.sprites.turret - idle.turret) > .1, 'the whole turret housing follows the target');
+    assert.ok(Math.abs(flash.sprites.turret - flash.sprites.barrel.angle) < .001);
+    assert.ok(Math.abs(flash.angle - flash.sprites.barrel.angle) < .001);
+    assert.ok(Math.hypot(flash.x - flash.sprites.barrel.x, flash.y - flash.sprites.barrel.y) < .5, 'the flash must be drawn on the sprite tip');
     await capture(page, 'turret-firing');
-    console.log('PASS: the running browser rendered a muzzle flash from the rotated cannon.');
+    console.log('PASS: the browser drew a fixed foundation, a rotating turret and barrel, and a flash on the sprite tip.');
   } finally {
     await page.close();
   }
@@ -348,6 +378,7 @@ try {
   if (output) await mkdir(output, { recursive:true });
   assert.equal((await fetch(`${base}/web`, { redirect:'manual' })).headers.get('location'), '/web/');
   assert.equal((await fetch(`${base}/scripts/`)).status, 404, 'directories other than the game index are not streamed');
+  assert.equal((await fetch(`${base}/web/art/fortress-atlas.webp`, { method: 'HEAD' })).headers.get('content-type'), 'image/webp');
   browser = await chromium.launch({ executablePath: process.env.KETHRA_BROWSER || undefined });
   await scenario(base, false);
   await scenario(base, true);

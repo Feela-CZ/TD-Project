@@ -6,7 +6,7 @@ import { extname, resolve, sep } from 'node:path';
 const project = resolve(import.meta.dirname, '..');
 const requestedPort = Number(process.argv.find((argument) => argument.startsWith('--port='))?.split('=')[1] ?? process.env.TD_PORT ?? 4173);
 const initialPort = Number.isInteger(requestedPort) && requestedPort > 0 && requestedPort < 65536 ? requestedPort : 4173;
-const types = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8' };
+const types = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.webp': 'image/webp' };
 
 const server = createServer(async (request, response) => {
   if (request.method !== 'GET' && request.method !== 'HEAD') {

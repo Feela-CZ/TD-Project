@@ -1,3 +1,14 @@
+import { BARREL_REACH } from './turret-motion.mjs';
+
+const fortressSprites = {
+  foundation: [0, 0, 288, 288],
+  turret: [294, 0, 150, 160],
+  barrel: [450, 0, 68, 224]
+};
+const barrelHeight = 88;
+// The upper six texels are transparent padding in the barrel tile.
+const barrelTop = -BARREL_REACH - 6 * barrelHeight / fortressSprites.barrel[3];
+
 const edge = '#080b0a';
 
 function sample(seed) {
@@ -83,7 +94,7 @@ function paintTerrain(width, height) {
   return tile;
 }
 
-export function createArenaArt(ctx, canvas, routePoint) {
+export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
   const terrain = paintTerrain(canvas.width, canvas.height);
   function route(from, to) {
     const path = new Path2D();
@@ -141,67 +152,44 @@ export function createArenaArt(ctx, canvas, routePoint) {
     }
   }
 
-  function drawTower(tower, color, label, pose) {
+  function drawTower(color, label, pose) {
+    const { x, y } = pose.pivot;
+    const spritesReady = fortressAtlas.complete && fortressAtlas.naturalWidth > 0;
+
     ctx.save();
-    ctx.translate(tower.x, tower.y);
-    ctx.fillStyle = '#060a079c';
+    ctx.translate(x, y);
+    ctx.fillStyle = '#070c0ab8';
     ctx.beginPath();
-    ctx.ellipse(4, 12, 52, 32, 0, 0, Math.PI * 2);
+    ctx.ellipse(3, 6, 58, 56, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = `${color}55`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 56, 0, Math.PI * 2);
+    ctx.stroke();
 
-    const outline = [[-48,7],[-34,-21],[-22,-29],[22,-29],[34,-21],[48,7],[36,24],[-36,24]];
-    const plating = ctx.createLinearGradient(0, -29, 0, 24);
-    plating.addColorStop(0, '#60695a');
-    plating.addColorStop(.42, '#343e35');
-    plating.addColorStop(1, '#202922');
-    plate(outline.map(([x,y]) => [x,y+6]), '#121813', '#555e50');
-    plate(outline, plating, '#929988');
-
-    for (const direction of [-1, 1]) {
-      ctx.save();
-      ctx.scale(direction, 1);
-      plate([[22,-22],[32,-16],[43,7],[35,18],[26,18],[30,7]], '#252f27', '#536253');
-      for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = '#111914';
-        ctx.fillRect(30 + i * 2, 1 + i * 3, 5, 1);
-      }
-      ctx.fillStyle = color;
-      ctx.fillRect(32, 13, 4, 1.5);
-      ctx.restore();
+    if (spritesReady) {
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(fortressAtlas, ...fortressSprites.foundation, -60, -57, 116, 116);
+    } else {
+      ctx.fillStyle = '#39443a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 50, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.restore();
 
-    ctx.save();
-    ctx.translate(pose.pivot.x, pose.pivot.y);
-    ctx.fillStyle = '#172019';
-    ctx.strokeStyle = '#8c9782';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = `${color}60`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(0, 0, 18, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.rotate(pose.angle);
-    plate([[-18,-10],[-8,-15],[14,-13],[24,-6],[24,6],[14,13],[-8,15],[-18,10]], '#4e5c4c', '#a3ad97');
-    plate([[-14,-7],[-5,-11],[12,-9],[18,-4],[18,4],[12,9],[-5,11],[-14,7]], '#29382d', '#626f5f');
-
-    ctx.translate(-pose.recoil, 0);
-    const steel = ctx.createLinearGradient(0, -7, 0, 7);
-    steel.addColorStop(0, '#a9b4a2');
-    steel.addColorStop(.35, '#697965');
-    steel.addColorStop(.58, '#455646');
-    steel.addColorStop(1, '#24322a');
-    plate([[2,-7],[21,-7],[23,-5],[42,-4],[42,4],[23,5],[21,7],[2,7]], steel, '#adbaaa');
-    plate([[40,-6],[46,-6],[49,-4],[49,4],[46,6],[40,6]], '#202c24', '#9aa793');
-    ctx.fillStyle = '#121a15';
-    ctx.fillRect(46, -2, 3, 4);
-    ctx.fillStyle = color;
-    ctx.fillRect(9, -.85, 13, 1.7);
+    // The source sprites point up. Rotate both around the stationary bearing,
+    // and retract only the barrel. The breech covers the barrel's rear collar.
+    ctx.rotate(pose.angle + Math.PI / 2);
+    if (spritesReady) {
+      ctx.drawImage(fortressAtlas, ...fortressSprites.barrel, -13, barrelTop + pose.recoil, 26, barrelHeight);
+      ctx.drawImage(fortressAtlas, ...fortressSprites.turret, -28, -29.5, 56, 59);
+    } else {
+      ctx.fillStyle = '#919881';
+      ctx.fillRect(-7, -BARREL_REACH + pose.recoil, 14, BARREL_REACH);
+      ctx.fillStyle = '#617260';
+      ctx.fillRect(-17, -20, 34, 39);
+    }
     ctx.restore();
 
     if (pose.effect) drawMuzzleEffect(pose.effect, color);
@@ -210,16 +198,16 @@ export function createArenaArt(ctx, canvas, routePoint) {
     ctx.fillStyle = '#f7e8c5';
     ctx.font = '700 9px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText(label, tower.x, tower.y + 44);
+    ctx.fillText(label, x, y + 66);
     ctx.restore();
   }
 
-  function drawMuzzleEffect({ muzzle, angle, flash, sparkAge, hotShot }, color) {
-    ctx.save();
-    ctx.translate(muzzle.x, muzzle.y);
-    ctx.rotate(angle);
+  function drawMuzzleEffect({ muzzle, flashPoint, angle, flash, sparkAge, hotShot }, color) {
     const glow = hotShot ? '#e9ff67' : color;
-    if (flash > 0) {
+    if (flashPoint) {
+      ctx.save();
+      ctx.translate(flashPoint.x, flashPoint.y);
+      ctx.rotate(angle);
       const radius = 12 + 8 * flash;
       const light = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
       light.addColorStop(0, '#fff6c5');
@@ -230,8 +218,12 @@ export function createArenaArt(ctx, canvas, routePoint) {
       ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
       ctx.globalAlpha = flash;
       plate([[-3,0],[1,-6],[5,-2],[13+7*flash,0],[5,2],[1,6]], '#fff6c8');
+      ctx.restore();
     }
     if (sparkAge !== null) {
+      ctx.save();
+      ctx.translate(muzzle.x, muzzle.y);
+      ctx.rotate(angle);
       ctx.globalAlpha = .8 * (1 - sparkAge / .19);
       ctx.strokeStyle = glow;
       ctx.lineWidth = 1.2;
@@ -243,8 +235,8 @@ export function createArenaArt(ctx, canvas, routePoint) {
         ctx.lineTo(distance, y);
         ctx.stroke();
       }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   return { drawBackground: () => ctx.drawImage(terrain, 0, 0), drawTrack, drawTower };
