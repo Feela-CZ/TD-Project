@@ -19,7 +19,7 @@
           <nav class="game-toolbar" aria-label="Game controls">
             <button id="start" type="button" class="primary">Start match</button>
             <button type="button" data-open aria-controls="upgrade-panel">Upgrades</button>
-            <button type="button" data-rival hidden>Opponent</button>
+            <button type="button" data-rival>Opponent</button>
             <button type="button" data-stats data-open-dialog="match-overview" aria-haspopup="dialog">Stats</button>
           </nav>
           <section class="portrait-hud" aria-label="Match at a glance">
@@ -100,7 +100,18 @@
       <dialog class="game-dialog" id="match-settings" aria-labelledby="settings-title">
         <div class="dialog-layout">
           <header class="dialog-header"><h2 id="settings-title">Match settings</h2><button type="button" data-close-dialog autofocus>Close</button></header>
-          <div class="actions"><label class="mode">Mode <select id="mode"><option value="solo" selected>Solo</option><option value="versus">Versus bot</option></select></label><label id="bot-profile-label" class="mode" hidden>Bot <select id="bot-profile"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="economy">Economy</option><option value="mutation">Mutation-heavy</option></select></label><label class="sound-setting"><input id="sound-effects" type="checkbox" checked> Sound effects</label><button id="restart">Restart match</button></div>
+          <div class="actions">
+            <label class="bot-setting">Bot profile
+              <select id="bot-profile">
+                <option value="balanced" selected>Balanced</option>
+                <option value="aggressive">Aggressive</option>
+                <option value="economy">Economy</option>
+                <option value="mutation">Mutation-heavy</option>
+              </select>
+            </label>
+            <label class="sound-setting"><input id="sound-effects" type="checkbox" checked> Sound effects</label>
+            <button id="restart" type="button">Restart match</button>
+          </div>
         </div>
       </dialog>
       <dialog class="game-dialog" id="match-overview" aria-labelledby="overview-title">

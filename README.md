@@ -4,7 +4,7 @@ Playable browser alpha of a deterministic tower-defense duel. Build your fortres
 
 ## Current alpha
 
-- Solo progression and four selectable bot profiles.
+- Matches against a bot with four selectable profiles.
 - 60-wave deterministic combat loop with delayed physical Rounds.
 - Three upgrade branches: **Offense**, **Mutation**, and **Utility**.
 - Nine Tier I ranks, five Tier II ranks, branch commitment, active abilities, Ultimates, Flux economy, interest, fog of war, Tempo Charge, Kethra variants, bosses, and visual combat feedback.
@@ -24,7 +24,7 @@ Requires Node.js 20 or newer.
 npm run play
 ```
 
-Open the displayed local URL, select Solo progression or Versus bot, then press **Start match**.
+Open the displayed local URL and press **Start match** to play against the Balanced bot. Choose a different bot profile in Match settings.
 
 ## Verify
 

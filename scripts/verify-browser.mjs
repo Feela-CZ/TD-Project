@@ -110,7 +110,8 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await tones(), 0, 'audio must await a player gesture');
     assert.equal(await page.locator('#portrait-wave').textContent(), 'Wave 1 / 60');
     assert.equal(await page.locator('#strain-meter').getAttribute('max'), '100');
-    assert.equal(await page.locator('[data-rival]').isVisible(), false);
+    assert.equal(await page.locator('#mode').count(), 0, 'the game has a single match mode');
+    assert.equal(await page.locator('[data-rival]').isVisible(), true);
     assert.equal(await page.locator('[data-abilities]').count(), 0, 'combat abilities must not use a generic menu button');
     assert.equal(await page.locator('#action-dock').isVisible(), false, 'the dock appears when an ability is earned');
     if (mobile) {
@@ -285,9 +286,6 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await tones(), mutedTones, 'restarting a muted match plays no cue');
     assert.equal(await active.count(), 0, 'restart must reset a purchased ability');
 
-    await press(page.locator('[data-open-dialog="match-settings"]'));
-    await page.locator('#mode').selectOption('versus');
-    await press(page.locator('#match-settings [data-close-dialog]'));
     const opponent = page.locator('[data-rival]');
     assert.equal(await opponent.isEnabled(), true);
     await press(opponent);
@@ -593,9 +591,19 @@ async function verifyAbilityChoices(base) {
   try {
     await exposeMatch(page);
     await page.goto(base);
+    const start = page.locator('#start');
+    await start.tap();
+    await page.waitForFunction(() => {
+      const match = window.aimingTestMatch;
+      return match.botProfile === 'balanced' && !match.balanceConfig.soloProgression &&
+        match.balanceConfig.botEnabled && match.players.bot.purchaseLog.length > 0;
+    });
     await page.locator('[data-open-dialog="match-settings"]').tap();
-    await page.locator('#mode').selectOption('versus');
+    await page.locator('#bot-profile').selectOption('aggressive');
+    assert.equal(await start.textContent(), 'Start match');
+    assert.equal(await page.evaluate(() => window.aimingTestMatch.botProfile), 'aggressive');
     await page.locator('#restart').tap();
+    await page.waitForFunction(() => window.aimingTestMatch.players.bot.purchaseLog.length > 0);
 
     for (const [root, path, ultimate] of [
       ['overdrive', 'phaseShield', 'conjunctionSpheres'],
@@ -655,7 +663,7 @@ async function verifyAbilityChoices(base) {
         assert.equal(await options.isVisible(), false);
       }
     }
-    console.log('PASS: full combat dock fits a 320 px phone and both contextual ability choices work.');
+    console.log('PASS: the default bot buys upgrades, profile switching restarts the match, and the full combat dock fits a 320 px phone.');
   } finally {
     await page.close();
   }
@@ -742,10 +750,9 @@ async function verifyFixedViewports(base) {
       }
       await page.keyboard.press('Escape');
       await page.locator('[data-open-dialog="match-settings"]').click();
-      await page.locator('#mode').selectOption('versus');
-      await checkFit('versus settings', ['#match-settings', '#bot-profile', '#sound-effects', '#restart']);
+      await checkFit('bot settings', ['#match-settings', '#bot-profile', '#sound-effects', '#restart']);
       await page.keyboard.press('Escape');
-      await checkFit('versus battlefield', ['main', '#arena', '[data-rival]']);
+      await checkFit('opponent controls', ['main', '#arena', '[data-rival]']);
     } finally {
       await page.close();
     }

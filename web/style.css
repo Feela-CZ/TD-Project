@@ -47,8 +47,8 @@ h3 { font-size: .92rem; }
   display: grid; gap: 10px; padding: 12px; border: 1px solid #536174;
   border-radius: 8px; background: var(--surface); box-shadow: 0 12px 30px #0008;
 }
-.mode { display: grid; gap: 4px; color: var(--muted); font-size: .84rem; }
-.mode select { color: #eff0f3; }
+.bot-setting { display: grid; gap: 4px; color: var(--muted); font-size: .84rem; }
+.bot-setting select { color: #eff0f3; }
 .desktop-shell { display: grid; grid-template-columns: minmax(180px,.53fr) minmax(320px,1.32fr) minmax(320px,1fr); gap: 16px; align-items: start; }
 .side-panel { min-width: 0; display: grid; gap: 10px; }
 .panel,.upgrade-panel {

@@ -44,8 +44,7 @@ export function createTouchUi({ openUpgrades, closeUpgrades }) {
   desktop.addEventListener('change', layout);
   layout();
 
-  function refresh(versus, opponentView, reconAvailable) {
-    rival.hidden = !versus;
+  function refresh(opponentView, reconAvailable) {
     const label = opponentView ? 'Own fortress' : 'Opponent';
     if (rival.textContent !== label) rival.textContent = label;
     if (!reconAvailable && !reconTab.hidden && reconTab.getAttribute('aria-pressed') === 'true') {

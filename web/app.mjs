@@ -10,16 +10,12 @@ const context = canvas.getContext('2d');
 const status = document.querySelector('#status');
 const start = document.querySelector('#start');
 const restart = document.querySelector('#restart');
-const mode = document.querySelector('#mode');
 const botProfile = document.querySelector('#bot-profile');
-const botProfileLabel = document.querySelector('#bot-profile-label');
 const soundSetting = document.querySelector('#sound-effects');
 const gameAudio = createGameAudio();
 const result = document.querySelector('#result');
 const recon = document.querySelector('#recon');
 const overview = document.querySelector('#match-overview');
-const stage = document.querySelector('.game-stage');
-const mapNav = document.querySelector('#map-nav');
 const swipeMap = document.querySelector('#swipe-map');
 const actionDock = document.querySelector('#action-dock');
 const abilityOptions = document.querySelector('#ability-options');
@@ -34,7 +30,7 @@ const waveTimer = document.querySelector('#incursion-next');
 const waveLabel = document.querySelector('#portrait-wave');
 const fluxLabel = document.querySelector('#portrait-flux');
 const strainLabel = document.querySelector('#overload');
-const createMatch = () => new LiveMatch(undefined, mode.value === 'solo' ? { botEnabled: false, soloProgression: true } : { botProfile:botProfile.value });
+const createMatch = () => new LiveMatch(undefined, { botProfile: botProfile.value });
 let match = createMatch();
 let running = false;
 let paused = false;
@@ -74,18 +70,9 @@ function showStatus(message) {
 }
 
 function setMapView(view, snapshot = latestSnapshot ?? match.snapshot()) {
-  if (view === 'bot' && mode.value === 'solo') return;
   if (view !== mapView) aim = null;
   mapView = view;
   render(snapshot);
-}
-
-function setModeUi() {
-  const solo = mode.value === 'solo';
-  botProfileLabel.hidden = solo;
-  mapNav.hidden = solo;
-  stage.toggleAttribute('data-versus', !solo);
-  if (solo) mapView = 'human';
 }
 
 soundSetting.checked = gameAudio.enabled;
@@ -113,8 +100,7 @@ function resetMatch(active = false) {
   render(match.snapshot());
   if (active) startAudio(true);
 }
-mode.addEventListener('change', () => { setModeUi(); resetMatch(); });
-botProfile.addEventListener('change', () => { if (mode.value === 'versus') { setModeUi(); resetMatch(); } });
+botProfile.addEventListener('change', () => resetMatch());
 start.addEventListener('click', () => {
   if (latestSnapshot.result) {
     resetMatch(true);
@@ -207,7 +193,7 @@ canvas.addEventListener('pointerup', event => {
   const dx = event.clientX - swipeStart.x;
   const dy = event.clientY - swipeStart.y;
   swipeStart = null;
-  if (swipeMap.checked && mode.value === 'versus' && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+  if (swipeMap.checked && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
     setMapView(dx < 0 ? 'bot' : 'human');
     return;
   }
@@ -530,7 +516,7 @@ function renderFieldControls(snapshot) {
   const arenaLabel = aim ? `Aim ${ultimateLabels[aim]}` : 'Fortress battlefield';
   if (canvas.getAttribute('aria-label') !== arenaLabel) canvas.setAttribute('aria-label', arenaLabel);
 
-  portraitTempo.hidden = mode.value !== 'versus' || (!human.tempoCharge && !human.tempoQueued);
+  portraitTempo.hidden = !human.tempoCharge && !human.tempoQueued;
   portraitTempo.disabled = !running || paused || !human.tempoCharge || human.tempoQueued;
   setText(portraitTempo, human.tempoQueued ? 'Early wave queued' : 'Send next wave early');
 }
@@ -613,7 +599,7 @@ let nextIdleFrame = 0;
 
 function drawBattlefield(snapshot) {
   context.clearRect(0, 0, canvas.width, canvas.height);
-  const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot' && mode.value === 'versus', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
+  const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
   arenaWrap.toggleAttribute('data-fogged', opponentView && !visible);
   drawSide(viewedPlayer, viewedSide, opponentView ? '#c99ce4' : '#e8bb79', visible); if (opponentView && !visible) drawFogOverlay(reconLevel, bot); if (visible) drawCritFloats(snapshot);
   drawAim();
@@ -631,12 +617,14 @@ function render(snapshot) {
   for (const [id, player] of Object.entries({ human, bot })) { const earned = document.querySelector(`#${id}-earned`), interest = document.querySelector(`#${id}-interest`), avarice = document.querySelector(`#${id}-avarice`), next = document.querySelector(`#${id}-interest-next`); if (earned) earned.textContent = String(player.earnedEnergy); if (interest) interest.textContent = String(player.interestEnergy); if (avarice) avarice.textContent = String(player.avariceEnergy); if (next) next.textContent = `${player.nextInterestIn.toFixed(1)} s · +${Math.floor(player.nextInterestEstimate)}`; }
   document.querySelector('#human-interest-rate').textContent = `${(human.interestRate * 100).toFixed(2)}% / 6s`;
   document.querySelector('#combat-damage').textContent = human.combat.damage.join('–'); document.querySelector('#combat-speed').textContent = `${human.combat.attackRate.toFixed(2)} / s`; document.querySelector('#combat-crit').textContent = `${(human.combat.criticalChance * 100).toFixed(1)}%`; document.querySelector('#combat-multiplier').textContent = typeof human.combat.criticalMultiplier === 'number' ? `${human.combat.criticalMultiplier}×` : human.combat.criticalMultiplier;
-  const versus = mode.value === 'versus'; document.querySelectorAll('[data-bot-strain]').forEach((element) => { element.hidden = !versus || reconLevel < 1; }); document.querySelectorAll('[data-bot-economy]').forEach((element) => { element.hidden = !versus || reconLevel < TIER2_MAX_LEVEL; }); portraitMap.disabled = !versus; portraitMap.textContent = opponentView ? 'Your fortress' : 'Opponent';
-  if (versus && reconLevel && overview.open && !recon.hidden) renderRecon(bot, reconLevel);
+  document.querySelectorAll('[data-bot-strain]').forEach(element => { element.hidden = reconLevel < 1; });
+  document.querySelectorAll('[data-bot-economy]').forEach(element => { element.hidden = reconLevel < TIER2_MAX_LEVEL; });
+  setText(portraitMap, opponentView ? 'Your fortress' : 'Opponent');
+  if (reconLevel && overview.open && !recon.hidden) renderRecon(bot, reconLevel);
   renderFieldControls(snapshot);
   upgradePanel.refresh(snapshot, running);
   renderActionDock(snapshot);
-  touchUi.refresh(versus, opponentView, versus && reconLevel > 0);
+  touchUi.refresh(opponentView, reconLevel > 0);
   result.hidden = !snapshot.result; result.textContent = snapshot.result ?? '';
 }
 function frame(now) {
@@ -686,4 +674,4 @@ const touchUi = createTouchUi({ openUpgrades, closeUpgrades: upgradePanel.close 
 fortressAtlas.addEventListener('load', () => {
   if (!running || paused) render(match.snapshot());
 });
-setModeUi(); render(match.snapshot()); requestAnimationFrame(frame);
+render(match.snapshot()); requestAnimationFrame(frame);

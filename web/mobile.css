@@ -54,10 +54,9 @@ main {
 .status {
   position: absolute; z-index: 3; inset: .4rem .45rem auto; margin: 0; pointer-events: none;
 }
-.field-actions { grid-area: commands; min-width: 0; }
-.field-actions:has(> [hidden]) { display: none; }
-.game-stage[data-versus] .field-actions {
-  display: grid; grid-template-columns: minmax(0, 1fr); min-height: 2.3rem; align-items: start;
+.field-actions {
+  grid-area: commands; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr);
+  min-height: 2.3rem; align-items: start;
 }
 .field-actions > button { margin: 0; min-height: 2.3rem; padding: 4px 6px; }
 
@@ -85,10 +84,10 @@ main {
 .dialog-pagination span { color: var(--muted); font-size: .82rem; }
 .dialog-pagination button { min-height: 37px; padding: 4px 8px; }
 #match-settings .actions {
-  position: static; width: auto; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+  position: static; width: auto; grid-template-columns: minmax(0, 1fr);
   padding: 0; border: 0; box-shadow: none; align-items: end;
 }
-#match-settings .mode { min-width: 0; }
+#match-settings .bot-setting { min-width: 0; }
 #match-settings select { width: 100%; min-width: 0; padding-inline: 5px; }
 #match-settings #restart { grid-column: 1 / -1; }
 .sound-setting {
@@ -184,7 +183,7 @@ main {
 @media (max-height: 335px) and (min-width: 450px) {
   .masthead h1 { font-size: 1.04rem; }
   .game-stage { gap: 3px; }
-  .game-toolbar button, .field-actions > button, .game-stage[data-versus] .field-actions { min-height: 32px; }
+  .game-toolbar button, .field-actions > button, .field-actions { min-height: 32px; }
   .portrait-hud > div { padding: 2px 4px; }
   #match-overview .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   [data-screen="match"] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
