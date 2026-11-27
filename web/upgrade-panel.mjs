@@ -8,7 +8,8 @@ const HOLD_TOLERANCE = 10;
 const TIER_LABELS = ['Tier I · Basic upgrade', 'Tier II · Specialization', 'Tier III · Ultimate'];
 
 export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
-  const mobile = matchMedia('(max-width: 760px)');
+  const desktopLayout = matchMedia('(min-width: 1120px) and (min-height: 660px)');
+  const touch = matchMedia('(pointer: coarse)');
   const tree = panel.querySelector('.upgrade-tree');
   const families = panel.querySelector('[data-families]');
   const specializations = panel.querySelector('[data-specializations]');
@@ -135,7 +136,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     if (level === offer.max) message = '';
     else if (!reason) {
       const action = level ? 'upgrade' : 'unlock';
-      const input = mobile.matches ? 'Tap' : 'Click';
+      const input = touch.matches ? 'Tap' : 'Click';
       const price = priceLabel(offer);
       message = `${input} to ${action} · ${price}`;
     }
@@ -300,8 +301,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   });
 
   function open() {
-    if (mobile.matches && !sheet.open) sheet.showModal();
-    heading.focus();
+    if (!desktopLayout.matches && !sheet.open) sheet.showModal();
+    heading.focus({ preventScroll: true });
   }
 
   function close() {
@@ -311,8 +312,15 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   }
 
   function layout() {
-    close();
-    (mobile.matches ? sheet : desktop).append(panel);
+    const wasOpen = sheet.open;
+    const detailsOpen = description.open;
+    const focused = panel.contains(document.activeElement) ? document.activeElement : null;
+    cancelHold();
+    if (wasOpen && desktopLayout.matches) sheet.close();
+    (desktopLayout.matches ? desktop : sheet).append(panel);
+    if (!desktopLayout.matches && (focused || detailsOpen) && !sheet.open) sheet.showModal();
+    if (detailsOpen && !description.open) description.showModal();
+    else if ((focused || wasOpen) && !detailsOpen) (focused ?? heading).focus({ preventScroll: true });
     if (snapshot) refresh(snapshot, running);
   }
 
@@ -324,7 +332,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   }
 
   sheet.addEventListener('close', cancelHold);
-  mobile.addEventListener('change', layout);
+  desktopLayout.addEventListener('change', layout);
   layout();
   return { open, close, refresh, reset };
 }

@@ -12,42 +12,32 @@
     <main>
       <header class="masthead">
         <div><h1>Kethra Incursion</h1><p id="subtitle" class="subtitle">Solo · Defend your fortress</p></div>
-        <details class="match-settings"><summary>Match settings</summary>
-          <div class="actions"><label class="mode">Mode <select id="mode"><option value="solo" selected>Solo</option><option value="versus">Versus bot</option></select></label><label id="bot-profile-label" class="mode" hidden>Bot <select id="bot-profile"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="economy">Economy</option><option value="mutation">Mutation-heavy</option></select></label><button id="restart">Restart match</button></div>
-        </details>
+        <button type="button" data-open-dialog="match-settings" aria-haspopup="dialog">Match settings</button>
       </header>
       <section class="desktop-shell">
-        <aside class="side-panel left-panel" aria-label="Match overview">
-          <button type="button" class="overview-close">Close overview</button>
-          <button type="button" class="overview-restart">Restart match</button>
-          <section class="panel combat"><h2>Cannon stats</h2><dl class="metric-grid"><div><dt>Damage per shot</dt><dd id="combat-damage">24–30</dd></div><div><dt>Shots per second</dt><dd id="combat-speed">1.00 / s</dd></div><div><dt>Critical chance</dt><dd id="combat-crit">0.0%</dd></div><div><dt>Critical damage</dt><dd id="combat-multiplier">2×</dd></div></dl></section>
-          <details class="panel economy"><summary>Flux income</summary><p class="panel-note">Kills earn Flux. Unspent Flux earns interest every 6 seconds.</p><dl class="metric-grid"><div><dt>Flux earned</dt><dd id="human-earned">0</dd></div><div><dt>Interest earned</dt><dd id="human-interest">0</dd></div><div><dt>Bonus from Avarice</dt><dd id="human-avarice">0</dd></div><div><dt>Interest rate</dt><dd id="human-interest-rate">0.25% / 6s</dd></div><div><dt>Next payout</dt><dd id="human-interest-next">6.0 s</dd></div></dl></details>
-          <details class="panel"><summary>Match details</summary><p class="panel-note">Core strain rises as enemies pile up. You lose when the meter fills.</p><dl class="metric-grid"><div><dt>Time played</dt><dd id="clock">00:00</dd></div><div data-bot-strain hidden><dt>Opponent strain</dt><dd id="bot-overload">—</dd></div></dl></details>
-          <section id="map-nav" class="map-nav" aria-label="Map settings"><button id="portrait-map" type="button">Opponent</button><details class="settings"><summary>Settings</summary><label><input id="swipe-map" type="checkbox" checked> Swipe horizontally on the map to switch sector</label></details></section>
-        </aside>
         <section class="game-stage" aria-label="Fortress and controls">
           <nav class="game-toolbar" aria-label="Game controls">
             <button id="start" type="button" class="primary">Start match</button>
             <button type="button" data-open aria-controls="upgrade-panel">Upgrades</button>
             <button type="button" data-rival hidden>Opponent</button>
-            <button type="button" data-stats aria-expanded="false">Stats</button>
+            <button type="button" data-stats data-open-dialog="match-overview" aria-haspopup="dialog">Stats</button>
+            <button type="button" data-abilities data-open-dialog="ability-menu" aria-haspopup="dialog" disabled>Abilities</button>
           </nav>
+          <section class="portrait-hud" aria-label="Match at a glance">
+            <div><span>Flux</span><strong id="portrait-flux">150</strong></div>
+            <div><span id="portrait-wave">Wave 1 / 60</span><strong id="incursion-next">45s</strong><small id="next-wave-label">Until next wave</small></div>
+            <div><span id="strain-label">Core strain</span><strong id="overload">0 / 100</strong><progress id="strain-meter" value="0" max="100" aria-labelledby="strain-label"></progress></div>
+          </section>
           <section class="arena-wrap">
-            <section class="portrait-hud" aria-label="Match at a glance">
-              <div><span>Flux</span><strong id="portrait-flux">150</strong></div>
-              <div><span id="portrait-wave">Wave 1 / 60</span><strong id="incursion-next">45s</strong><small id="next-wave-label">Until next wave</small></div>
-              <div><span id="strain-label">Core strain</span><strong id="overload">0 / 100</strong><progress id="strain-meter" value="0" max="100" aria-labelledby="strain-label"></progress></div>
-            </section>
             <canvas id="arena" width="420" height="700" tabindex="-1" aria-label="Fortress battlefield" aria-describedby="field-tip">Your browser does not support Canvas.</canvas>
             <img id="fortress-atlas" src="art/fortress-atlas.webp" alt="" hidden fetchpriority="high">
             <div class="field-guide"><p id="field-tip">Your cannon fires on its own. Spend Flux on upgrades.</p><button id="cancel-aim" type="button" hidden>Cancel aim</button></div>
+            <p id="status" class="status" role="status" hidden></p>
             <div id="result" class="result" hidden></div>
           </section>
           <section class="field-actions" aria-label="Combat controls">
             <button id="portrait-tempo" type="button" disabled hidden>Send next wave early</button>
-            <section id="action-dock" class="action-dock" aria-label="Unlocked abilities" hidden></section>
           </section>
-          <p id="status" class="status" role="status" hidden></p>
         </section>
         <aside class="side-panel right-panel" aria-label="Fortress upgrades">
           <section id="upgrade-panel" class="upgrade-panel">
@@ -101,7 +91,54 @@
         </aside>
       </section>
       <dialog class="upgrade-sheet" id="upgrade-sheet" aria-labelledby="upgrade-title"></dialog>
-      <section id="recon" class="controls" hidden></section>
+      <dialog class="game-dialog" id="match-settings" aria-labelledby="settings-title">
+        <div class="dialog-layout">
+          <header class="dialog-header"><h2 id="settings-title">Match settings</h2><button type="button" data-close-dialog autofocus>Close</button></header>
+          <div class="actions"><label class="mode">Mode <select id="mode"><option value="solo" selected>Solo</option><option value="versus">Versus bot</option></select></label><label id="bot-profile-label" class="mode" hidden>Bot <select id="bot-profile"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="economy">Economy</option><option value="mutation">Mutation-heavy</option></select></label><button id="restart">Restart match</button></div>
+        </div>
+      </dialog>
+      <dialog class="game-dialog" id="match-overview" aria-labelledby="overview-title">
+        <div class="dialog-layout">
+          <header class="dialog-header"><h2 id="overview-title">Match overview</h2><button type="button" class="overview-close" data-close-dialog autofocus>Close</button></header>
+          <nav class="dialog-tabs" aria-label="Match overview sections">
+            <button type="button" data-view="combat" aria-pressed="true">Cannon</button>
+            <button type="button" data-view="income" aria-pressed="false">Flux</button>
+            <button type="button" data-view="match" aria-pressed="false">Match</button>
+            <button type="button" data-view="recon" aria-pressed="false" hidden>Recon</button>
+          </nav>
+          <section data-screen="combat"><section class="panel combat"><h2>Cannon stats</h2><dl class="metric-grid"><div><dt>Damage per shot</dt><dd id="combat-damage">24–30</dd></div><div><dt>Shots per second</dt><dd id="combat-speed">1.00 / s</dd></div><div><dt>Critical chance</dt><dd id="combat-crit">0.0%</dd></div><div><dt>Critical damage</dt><dd id="combat-multiplier">2×</dd></div></dl></section></section>
+          <section data-screen="income" hidden><section class="panel economy"><h3>Flux income</h3><p class="panel-note">Kills earn Flux. Unspent Flux earns interest every 6 seconds.</p><dl class="metric-grid"><div><dt>Flux earned</dt><dd id="human-earned">0</dd></div><div><dt>Interest earned</dt><dd id="human-interest">0</dd></div><div><dt>Bonus from Avarice</dt><dd id="human-avarice">0</dd></div><div><dt>Interest rate</dt><dd id="human-interest-rate">0.25% / 6s</dd></div><div><dt>Next payout</dt><dd id="human-interest-next">6.0 s</dd></div></dl></section></section>
+          <div data-screen="match" hidden>
+            <section class="panel"><h3>Match details</h3><p class="panel-note">Core strain rises as enemies pile up. You lose when the meter fills.</p><dl class="metric-grid"><div><dt>Time played</dt><dd id="clock">00:00</dd></div><div data-bot-strain hidden><dt>Opponent strain</dt><dd id="bot-overload">—</dd></div></dl></section>
+            <section id="map-nav" class="map-nav" aria-label="Map settings"><button id="portrait-map" type="button">Opponent</button><div class="settings"><label><input id="swipe-map" type="checkbox" checked> Swipe horizontally on the map to switch sector</label></div></section>
+            <button type="button" class="overview-restart">Restart match</button>
+          </div>
+          <section id="recon" data-screen="recon" aria-label="Opponent reconnaissance" hidden>
+            <h3 data-recon-title></h3>
+            <p data-recon-strain></p>
+            <section class="recon-page" aria-label="Telemetry">
+              <h3 data-recon-section></h3>
+              <ul data-recon-entries></ul>
+            </section>
+            <nav class="dialog-pagination" aria-label="Recon pages">
+              <button type="button" data-recon-prev>Previous</button>
+              <span data-recon-position></span>
+              <button type="button" data-recon-next>Next</button>
+            </nav>
+          </section>
+        </div>
+      </dialog>
+      <dialog class="game-dialog" id="ability-menu" aria-labelledby="ability-title">
+        <div class="dialog-layout">
+          <header class="dialog-header"><h2 id="ability-title">Abilities</h2><button type="button" data-close-dialog autofocus>Close</button></header>
+          <section id="action-dock" class="action-dock" aria-label="Unlocked abilities"></section>
+          <nav class="dialog-pagination" aria-label="Ability pages" hidden>
+            <button type="button" data-ability-prev>Previous</button>
+            <span data-ability-position></span>
+            <button type="button" data-ability-next>Next</button>
+          </nav>
+        </div>
+      </dialog>
     </main>
     <script type="module" src="app.mjs"></script>
   </body>

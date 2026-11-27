@@ -1,29 +1,166 @@
-@media (max-width: 760px) {
-  main { max-width: 570px; padding: 10px max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
-  .masthead { padding: 0 0 8px; margin-bottom: 8px; gap: 6px; }
-  .masthead h1 { font-size: clamp(1.16rem, 4.9vw, 1.75rem); }
-  .subtitle { font-size: .74rem; }
-  .match-settings > summary { padding: 10px 6px; font-size: .77rem; }
-  .desktop-shell { display: block; }
-  .right-panel,.left-panel { display: none; }
-  .game-stage { max-width: none; }
-  .game-toolbar button,.field-actions button { min-height: 44px; padding: 6px; font-size: .81rem; }
-  .game-toolbar [data-stats],.game-toolbar [data-rival] { display: block; }
-  .portrait-hud > div { padding: 6px; }
-  .field-guide { font-size: .76rem; }
-  .field-guide button { min-height: 44px; padding: 5px; }
-  .overview-open .left-panel { display: grid; position: fixed; z-index: 5; inset: 0; overflow: auto; background: #171d25; padding: 12px; align-content: start; }
-  .overview-close,.overview-restart { display: block; min-height: 44px; }
-  .map-nav > button { display: none; }
-  .upgrade-sheet[open] { display: block; position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%,550px); max-width: none; max-height: 93dvh; padding: 0; background: transparent; color: inherit; border: 0; }
-  .upgrade-sheet::backdrop { background: #05070abd; }
-  .upgrade-panel { padding: 13px 12px max(13px, env(safe-area-inset-bottom)); }
-  .upgrade-heading {
-    position: sticky; z-index: 3; top: 0; margin: -13px -12px 0;
-    padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface);
+html, body { height: 100%; min-width: 0; min-height: 0; overflow: clip; overscroll-behavior: none; }
+button, select, label { touch-action: manipulation; }
+main {
+  --viewport-padding: clamp(5px, 1.2vmin, 16px);
+  --gap: clamp(4px, 1.1vmin, 12px);
+  width: 100%; max-width: none; height: 100vh; height: 100dvh;
+  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap);
+  padding: max(var(--viewport-padding), env(safe-area-inset-top))
+    max(var(--viewport-padding), env(safe-area-inset-right))
+    max(var(--viewport-padding), env(safe-area-inset-bottom))
+    max(var(--viewport-padding), env(safe-area-inset-left));
+}
+.masthead { gap: 8px; margin: 0; padding: 0 0 var(--gap); }
+.masthead h1 { font-size: clamp(1.18rem, 3.7vmin, 2.55rem); }
+.subtitle { margin-top: 3px; font-size: clamp(.73rem, 1.9vmin, .91rem); }
+.masthead button { flex: none; }
+.desktop-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; align-items: stretch; gap: var(--gap); }
+.right-panel { display: none; }
+.game-stage {
+  position: relative; display: grid; min-height: 0; max-width: none; margin: 0;
+  grid-template: "controls" auto "hud" auto "arena" minmax(0, 1fr) "commands" auto / minmax(0, 1fr);
+  gap: var(--gap);
+}
+.game-toolbar {
+  grid-area: controls; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  gap: 4px; margin: 0;
+}
+.game-toolbar button { min-width: 0; min-height: 44px; padding: 4px 2px; font-size: clamp(.72rem, 2.3vw, 1rem); line-height: 1.12; text-wrap: balance; overflow-wrap: anywhere; }
+.game-toolbar [data-stats], .game-toolbar [data-rival] { display: block; }
+.portrait-hud {
+  position: static; grid-area: hud; grid-template-columns: 1fr 1.32fr 1fr;
+  border: 1px solid #414948; border-radius: 7px; overflow: clip;
+}
+.portrait-hud > div { padding: 4px 7px; }
+.portrait-hud strong { font-size: clamp(.98rem, 2.75vmin, 1.36rem); }
+.arena-wrap {
+  grid-area: arena; display: grid; place-items: center; min-width: 0; min-height: 0; container-type: size;
+  overflow: clip; background: #0a1110;
+}
+#arena {
+  width: min(100%, calc(100cqh * var(--arena-ratio, .6))); height: min(100%, calc(100cqw / var(--arena-ratio, .6)));
+  touch-action: none;
+}
+#arena[data-horizontal] { --arena-ratio: calc(5 / 3); }
+.field-guide { font-size: .76rem; }
+.field-guide button { min-height: 44px; padding: 5px; }
+.status {
+  position: absolute; z-index: 3; inset: .4rem .45rem auto; margin: 0; pointer-events: none;
+}
+.field-actions { grid-area: commands; min-width: 0; }
+.field-actions:has(> [hidden]) { display: none; }
+.game-stage[data-versus] .field-actions {
+  display: grid; grid-template-columns: minmax(0, 1fr); min-height: 2.3rem; align-items: start;
+}
+.field-actions > button { margin: 0; min-height: 2.3rem; padding: 4px 6px; }
+
+.game-dialog, .upgrade-sheet, .upgrade-description {
+  --dialog-top: max(5px, env(safe-area-inset-top));
+  --dialog-right: max(5px, env(safe-area-inset-right));
+  --dialog-bottom: max(5px, env(safe-area-inset-bottom));
+  --dialog-left: max(5px, env(safe-area-inset-left));
+  position: fixed; inset: var(--dialog-top) var(--dialog-right) var(--dialog-bottom) var(--dialog-left);
+  width: min(100% - var(--dialog-left) - var(--dialog-right), 36rem);
+  max-width: none; max-height: calc(100dvh - var(--dialog-top) - var(--dialog-bottom));
+  margin: auto; padding: 0; overflow: clip; color: inherit;
+  background: var(--surface); border: 1px solid #59697a; border-radius: 12px;
+  box-shadow: 0 18px 60px #04070bdc;
+}
+.game-dialog::backdrop, .upgrade-sheet::backdrop, .upgrade-description::backdrop { background: #05070ac9; }
+.dialog-layout { display: grid; gap: 8px; padding: clamp(8px, 2vmin, 16px); }
+.dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.dialog-header h2 { font-size: 1.2rem; }
+.dialog-header button, .dialog-tabs button { min-height: 40px; padding: 5px 8px; }
+.dialog-tabs, .dialog-pagination { display: flex; align-items: center; gap: 5px; }
+.dialog-tabs button { flex: 1; min-width: 0; }
+.dialog-tabs [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.dialog-pagination { justify-content: space-between; }
+.dialog-pagination span { color: var(--muted); font-size: .82rem; }
+.dialog-pagination button { min-height: 37px; padding: 4px 8px; }
+#match-settings .actions {
+  position: static; width: auto; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+  padding: 0; border: 0; box-shadow: none; align-items: end;
+}
+#match-settings .mode { min-width: 0; }
+#match-settings select { width: 100%; min-width: 0; padding-inline: 5px; }
+#match-settings #restart { grid-column: 1 / -1; }
+#match-overview .panel { padding: 8px; box-shadow: none; }
+#match-overview .panel > h3 { margin-bottom: 4px; }
+#match-overview .panel-note { margin-bottom: 3px; }
+#match-overview .metric-grid div { padding: 4px 0 2px; }
+[data-screen="match"], #recon { display: grid; gap: 5px; }
+#map-nav { gap: 5px; }
+#map-nav label { display: flex; align-items: center; margin: 0; gap: 4px; }
+.overview-close, .overview-restart { display: block; }
+.recon-page ul { display: grid; gap: 2px; margin: 4px 0 0; padding-inline-start: 1.3em; font-size: .9rem; }
+.action-dock { padding: 0; min-width: 0; }
+.ability-page h3 { margin-bottom: 5px; }
+.ability-page > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.ability-page button { min-width: 0; min-height: 43px; padding: 4px; }
+.ability-page button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.upgrade-sheet[open] { display: block; }
+.upgrade-sheet .upgrade-panel { border: 0; background: transparent; box-shadow: none; }
+.upgrade-sheet .upgrade-mobile { display: block; }
+.upgrade-panel { padding: clamp(8px, 2vmin, 16px); }
+.upgrade-heading button, .upgrade-tabs button { min-height: 44px; }
+.upgrade-tabs { margin: 6px 0; }
+.mutation-hint { margin-bottom: 4px; }
+.upgrade-tree { --tree-gutter: 1.65rem; --tree-gap: 5px; }
+.tree-node { min-height: clamp(51px, 10dvh, 73px); padding: 4px 3px; gap: 3px; }
+.tree-links { height: clamp(8px, 2.5dvh, 20px); }
+.tree-links-specialization { height: clamp(10px, 3.3dvh, 27px); }
+.upgrade-detail { margin-top: 6px; padding: 7px; }
+.upgrade-help { margin-top: 5px; gap: 2px 6px; }
+.upgrade-description {
+  width: min(100% - var(--dialog-left) - var(--dialog-right), 38rem);
+  padding: clamp(9px, 2.4vmin, 21px);
+  border-top: 3px solid var(--tier);
+}
+.upgrade-description-header h2 { font-size: clamp(1.12rem, 4vmin, 1.52rem); }
+.upgrade-description-lead, .upgrade-description-body, .upgrade-description-requirement { margin-top: 7px; }
+.upgrade-description-body { padding: 6px 8px; }
+
+@media (min-aspect-ratio: 1/1) {
+  .game-stage {
+    grid-template: "hud arena" auto "controls arena" auto "commands arena" auto ". arena" minmax(0, 1fr)
+      / clamp(132px, 19vw, 250px) minmax(0, 1fr);
   }
-  .upgrade-mobile { display: block; }
-  .upgrade-heading button,.upgrade-tabs button { min-height: 44px; }
-  .upgrade-tree { --tree-gutter: 1.65rem; --tree-gap: 5px; }
-  .tree-node { min-height: 64px; }
+  .game-toolbar { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .game-toolbar button { font-size: clamp(.77rem, 2.1vmin, 1rem); }
+  .portrait-hud { grid-template-columns: 1fr; }
+  .portrait-hud > div { grid-template-columns: 1fr auto; align-items: center; }
+  .portrait-hud > div:nth-child(n) { text-align: left; }
+  .portrait-hud small, .portrait-hud progress { grid-column: 1 / -1; }
+  .field-guide { width: min(100% - 14px, 32rem); margin-inline: auto; }
+}
+@media (min-width: 1120px) and (min-height: 660px) {
+  .desktop-shell { grid-template-columns: minmax(0, 1fr) clamp(350px, 30vw, 510px); }
+  .right-panel { display: block; }
+  .right-panel .upgrade-panel { height: 100%; }
+}
+@media (max-height: 495px) and (min-width: 450px) {
+  .masthead { padding-bottom: 3px; }
+  .masthead button { min-height: 34px; padding: 3px 8px; }
+  .game-toolbar button { min-height: 39px; }
+  .field-guide { padding: 4px 6px; }
+  .upgrade-sheet { width: min(100% - var(--dialog-left) - var(--dialog-right), 49rem); }
+  .upgrade-sheet .upgrade-panel {
+    display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); align-items: start; gap: 4px 8px;
+  }
+  .upgrade-heading, .upgrade-tabs, .mutation-hint { grid-column: 1 / -1; }
+  .upgrade-tabs, .mutation-hint, .upgrade-detail, .upgrade-help { margin: 0; }
+  .upgrade-tree { grid-column: 1; grid-row: span 2; }
+  .upgrade-detail, .upgrade-help { grid-column: 2; }
+  .upgrade-heading button, .upgrade-tabs button { min-height: 36px; padding-block: 3px; }
+  .tree-node { min-height: 44px; font-size: .74rem; }
+  .tree-links { height: 6px; }
+  .tree-links-specialization { height: 10px; }
+  .dialog-layout { gap: 5px; }
+  .dialog-header button, .dialog-tabs button { min-height: 35px; }
+}
+@media (max-width: 349px) {
+  .masthead button { min-height: 37px; padding: 4px 6px; font-size: .78rem; }
+  .game-toolbar button { font-size: .7rem; }
+  .upgrade-tree { --tree-gutter: 1.35rem; --tree-gap: 3px; }
+  .tree-tier { min-width: 1.1rem; }
 }

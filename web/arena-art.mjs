@@ -94,7 +94,7 @@ function paintTerrain(width, height) {
   return tile;
 }
 
-export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
+export function createArenaArt(ctx, canvas, routePoint, fortressAtlas, drawLabel) {
   const terrain = paintTerrain(canvas.width, canvas.height);
   function route(from, to) {
     const path = new Path2D();
@@ -133,7 +133,7 @@ export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
       ctx.strokeStyle = `${color}a0`; ctx.strokeRect(-8, -8, 16, 16);
       ctx.restore();
       ctx.fillStyle = '#dedac3'; ctx.font = '700 8px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(index ? 'RETURN' : 'ENTRY', x, y + 34);
+      drawLabel(index ? 'RETURN' : 'ENTRY', x, y, 26);
     }
     ctx.restore();
   }
@@ -198,7 +198,7 @@ export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
     ctx.fillStyle = '#f7e8c5';
     ctx.font = '700 9px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText(label, x, y + 66);
+    drawLabel(label, x, y, 66);
     ctx.restore();
   }
 

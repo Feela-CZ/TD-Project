@@ -6,6 +6,9 @@ import { createTurretMotion, FORTRESS } from './turret-motion.mjs';
 
 const canvas = document.querySelector('#arena');
 const context = canvas.getContext('2d');
+const WORLD_WIDTH = canvas.width;
+const WORLD_HEIGHT = canvas.height;
+let horizontalArena = false;
 const status = document.querySelector('#status');
 const start = document.querySelector('#start');
 const restart = document.querySelector('#restart');
@@ -15,9 +18,13 @@ const botProfileLabel = document.querySelector('#bot-profile-label');
 const subtitle = document.querySelector('#subtitle');
 const result = document.querySelector('#result');
 const recon = document.querySelector('#recon');
+const overview = document.querySelector('#match-overview');
+const stage = document.querySelector('.game-stage');
 const mapNav = document.querySelector('#map-nav');
 const swipeMap = document.querySelector('#swipe-map');
 const actionDock = document.querySelector('#action-dock');
+const abilityMenu = document.querySelector('#ability-menu');
+const abilityButton = document.querySelector('[data-abilities]');
 const portraitMap = document.querySelector('#portrait-map');
 const portraitTempo = document.querySelector('#portrait-tempo');
 const fieldTip = document.querySelector('#field-tip');
@@ -46,6 +53,21 @@ function setText(element, copy) {
   if (element.textContent !== copy) element.textContent = copy;
 }
 
+function updatePager(previous, next, position, page, count) {
+  const focus = document.activeElement;
+  previous.disabled = page === 0;
+  next.disabled = page === count - 1;
+  if (focus === previous && previous.disabled) next.focus({ preventScroll: true });
+  if (focus === next && next.disabled) previous.focus({ preventScroll: true });
+  setText(position, `${page + 1} / ${count}`);
+}
+
+function addPages(pages, title, items) {
+  for (let offset = 0; offset < items.length; offset += 4) {
+    pages.push({ title, items: items.slice(offset, offset + 4) });
+  }
+}
+
 function showStatus(message) {
   clearTimeout(statusExpiry);
   status.hidden = !message;
@@ -65,6 +87,7 @@ function setModeUi() {
   botProfileLabel.hidden = solo;
   subtitle.textContent = solo ? 'Solo · Defend your fortress' : `Versus bot · ${BOT_PROFILES[botProfile.value].label}`;
   mapNav.hidden = solo;
+  stage.toggleAttribute('data-versus', !solo);
   if (solo) mapView = 'human';
 }
 
@@ -95,9 +118,10 @@ start.addEventListener('click', () => {
   render(match.snapshot());
 });
 restart.addEventListener('click', () => {
-  restart.closest('details').open = false;
+  restart.closest('dialog').close();
+  abilityMenu.close();
   resetMatch(true);
-  start.focus();
+  start.focus({ preventScroll: true });
 });
 portraitTempo.addEventListener('click', () => {
   if (!running || paused) return;
@@ -109,7 +133,9 @@ portraitMap.addEventListener('click', () => setMapView(mapView === 'human' ? 'bo
 
 function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
-  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+  const x = (event.clientX - rect.left) * canvas.width / rect.width;
+  const y = (event.clientY - rect.top) * canvas.height / rect.height;
+  return horizontalArena ? { x: WORLD_WIDTH - y, y: x } : { x, y };
 }
 
 function aimAt(point) {
@@ -135,13 +161,12 @@ function finishAim(cast) {
     showStatus(match.snapshot().message);
   } else showStatus('');
   render(match.snapshot());
-  const button = actionDock.querySelector(`[data-aim-ultimate="${id}"]`);
-  (button?.disabled ? start : button)?.focus({ preventScroll: true });
+  abilityButton.focus({ preventScroll: true });
 }
 
 aimCancel.addEventListener('click', () => finishAim(false));
 document.addEventListener('keydown', event => {
-  if (aim && event.key === 'Escape') {
+  if (aim && event.key === 'Escape' && !document.querySelector('dialog:modal')) {
     event.preventDefault();
     finishAim(false);
   }
@@ -197,6 +222,30 @@ canvas.addEventListener('pointerup', event => {
   if (Math.hypot(point.x - FORTRESS.x, point.y - FORTRESS.y) < 58) openUpgrades();
 });
 canvas.addEventListener('pointercancel', () => { swipeStart = null; });
+
+function projectPoint(x, y) {
+  return horizontalArena ? { x: y, y: WORLD_WIDTH - x } : { x, y };
+}
+
+function drawLabel(text, x, y, offsetY) {
+  const point = projectPoint(x, y);
+  context.save();
+  context.resetTransform();
+  context.fillText(text, point.x, point.y + offsetY);
+  context.restore();
+}
+
+function drawEnemyHealth(point, radius, hp) {
+  const anchor = projectPoint(point.x, point.y);
+  const width = (radius + 1) * 2;
+  context.save();
+  context.resetTransform();
+  context.fillStyle = '#081120';
+  context.fillRect(anchor.x - radius - 1, anchor.y - radius - 9, width, 3);
+  context.fillStyle = hp > .35 ? '#77e6a0' : '#ff8a6d';
+  context.fillRect(anchor.x - radius - 1, anchor.y - radius - 9, width * hp, 3);
+  context.restore();
+}
 
 function routePoint(progress) {
   if (progress <= .3) return { x:68, y:626 - progress / .3 * 408 };
@@ -280,7 +329,7 @@ function drawSide(player, side, color, visible) {
   });
   arenaArt.drawTower(color, side === 'human' ? 'YOUR FORTRESS' : 'RIVAL FORTRESS', pose);
   if (!visible) return;
-  for (const creep of player.creeps) { const point = points.get(creep.id); const hp = Math.max(0, creep.hp / creep.maxHp), radius=(creep.form?.includes('abomination')?18:creep.form?.includes('chimera')?12:creep.form==='fragment'?4:creep.form==='shard'?5:creep.form==='brood'?5:7)+(creep.boss?3:0); if (creep.slowUntil > snapshotTime) { context.strokeStyle = '#6ce5ff'; context.lineWidth = 2; context.shadowColor='#6ce5ff'; context.shadowBlur=8; context.beginPath(); context.arc(point.x, point.y + 5, radius+3, 0, Math.PI * 2); context.stroke(); context.shadowBlur=0; } if (creep.safeToken && creep.safeUntil > snapshotTime) { context.strokeStyle='#f7dc6f'; context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,radius+6,0,Math.PI*2); context.stroke(); } if (creep.chrysalisUntil > snapshotTime) { context.fillStyle='#c891ff77'; context.beginPath(); context.ellipse(point.x,point.y,radius+4,radius+8,0,0,Math.PI*2); context.fill(); } if (creep.burn) { context.fillStyle = '#ff8e46'; context.shadowColor='#ff5d3e'; context.shadowBlur=9; context.beginPath(); context.arc(point.x + radius*.7, point.y - radius, 3 + Math.sin(snapshotTime * 16 + creep.id), 0, Math.PI * 2); context.fill(); context.shadowBlur=0; } const baseColor = creep.boss?'#f3ad4f':creep.form?.includes('abomination')?'#b94c75':creep.form?.includes('chimera')?'#c47dff':creep.form==='fragment'?'#8bf2db':creepColor(creep, player); drawKethra(creep, point, radius, baseColor); context.fillStyle = '#081120'; context.fillRect(point.x - radius-1, point.y - radius - 9, (radius+1)*2, 3); context.fillStyle = hp > .35 ? '#77e6a0' : '#ff8a6d'; context.fillRect(point.x - radius-1, point.y - radius - 9, (radius+1)*2 * hp, 3); }
+  for (const creep of player.creeps) { const point = points.get(creep.id); const hp = Math.max(0, creep.hp / creep.maxHp), radius=(creep.form?.includes('abomination')?18:creep.form?.includes('chimera')?12:creep.form==='fragment'?4:creep.form==='shard'?5:creep.form==='brood'?5:7)+(creep.boss?3:0); if (creep.slowUntil > snapshotTime) { context.strokeStyle = '#6ce5ff'; context.lineWidth = 2; context.shadowColor='#6ce5ff'; context.shadowBlur=8; context.beginPath(); context.arc(point.x, point.y + 5, radius+3, 0, Math.PI * 2); context.stroke(); context.shadowBlur=0; } if (creep.safeToken && creep.safeUntil > snapshotTime) { context.strokeStyle='#f7dc6f'; context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,radius+6,0,Math.PI*2); context.stroke(); } if (creep.chrysalisUntil > snapshotTime) { context.fillStyle='#c891ff77'; context.beginPath(); context.ellipse(point.x,point.y,radius+4,radius+8,0,0,Math.PI*2); context.fill(); } if (creep.burn) { context.fillStyle = '#ff8e46'; context.shadowColor='#ff5d3e'; context.shadowBlur=9; context.beginPath(); context.arc(point.x + radius*.7, point.y - radius, 3 + Math.sin(snapshotTime * 16 + creep.id), 0, Math.PI * 2); context.fill(); context.shadowBlur=0; } const baseColor = creep.boss?'#f3ad4f':creep.form?.includes('abomination')?'#b94c75':creep.form?.includes('chimera')?'#c47dff':creep.form==='fragment'?'#8bf2db':creepColor(creep, player); drawKethra(creep, point, radius, baseColor); drawEnemyHealth(point, radius, hp); }
   for (const projectile of player.projectiles) {
     const target = points.get(projectile.targetId);
     const origin = motion.originFor(projectile.firedAt);
@@ -320,20 +369,35 @@ function drawCritFloats(snapshot) {
     if (float.player !== mapView) continue;
     const age = snapshot.time - float.startedAt; const alpha = Math.max(0, 1 - age / .65);
     const side = float.player === 'human' ? 'human' : 'bot'; const point = formationPoint(float.progress, side, float.targetId);
-    context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; context.fillText('Crit!', point.x, point.y - 24 - age * 28); context.globalAlpha = 1;
+    context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; drawLabel('Crit!', point.x, point.y, -24 - age * 28); context.globalAlpha = 1;
   }
 }
 function drawFogOverlay(reconLevel, opponent) {
-  const fog = context.createRadialGradient(210, 355, 30, 210, 355, 330); fog.addColorStop(0, '#0a1020b8'); fog.addColorStop(1, '#03060eea'); context.fillStyle = fog; context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#d5def3'; context.font = '800 20px system-ui'; context.textAlign = 'center'; context.fillText('FOG OF WAR', 210, 338);
+  const fog = context.createRadialGradient(210, 355, 30, 210, 355, 330); fog.addColorStop(0, '#0a1020b8'); fog.addColorStop(1, '#03060eea'); context.fillStyle = fog; context.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  context.fillStyle = '#d5def3'; context.font = '800 20px system-ui'; context.textAlign = 'center'; drawLabel('FOG OF WAR', 210, 350, -12);
   context.fillStyle = '#97a8cc'; context.font = '600 11px system-ui';
   const message = reconLevel >= 4 ? 'Live composition and cooldown telemetry available.' : reconLevel >= 3 ? 'Tier II telemetry available.' : reconLevel >= 2 ? 'Tier I telemetry available.' : reconLevel > 0 ? `Core Strain ${opponent.load} / ${opponent.overloadCap}` : 'Opponent Kethra, upgrades and economy are concealed.';
-  context.fillText(reconLevel ? `Spectral Relay: ${message}` : message, 210, 362);
-  context.fillText(reconLevel ? `Upgrade to rank ${TIER2_MAX_LEVEL} for full reconnaissance.` : 'Spectral Relay rank 1 reveals purchases and Core Strain.', 210, 382);
+  drawLabel(reconLevel ? `Spectral Relay: ${message}` : message, 210, 350, 12);
+  drawLabel(reconLevel ? `Upgrade to rank ${TIER2_MAX_LEVEL} for full reconnaissance.` : 'Spectral Relay rank 1 reveals purchases and Core Strain.', 210, 350, 32);
 }
 const priorities = { default: 'Automatic', veteran: 'Most laps', lowest: 'Lowest health', highest: 'Highest health', manual: 'Pick an enemy' };
 const contracts = { chimera: ['Chimera', 90], abomination: ['Abomination', 180], hp: ['+20% health', 55], armor: ['+2 armor', 55], speed: ['+15% speed', 55] };
 let abilityLayout = '';
+let abilityPage = 0;
+let abilityPages = [];
+const abilityPrevious = abilityMenu.querySelector('[data-ability-prev]');
+const abilityNext = abilityMenu.querySelector('[data-ability-next]');
+const abilityPosition = abilityMenu.querySelector('[data-ability-position]');
+
+function showAbilityPage(page) {
+  abilityPage = page;
+  abilityPages.forEach((panel, index) => { panel.hidden = index !== page; });
+  abilityPrevious.parentElement.hidden = abilityPages.length < 2;
+  if (abilityPages.length) updatePager(abilityPrevious, abilityNext, abilityPosition, page, abilityPages.length);
+}
+
+abilityPrevious.addEventListener('click', () => showAbilityPage(abilityPage - 1));
+abilityNext.addEventListener('click', () => showAbilityPage(abilityPage + 1));
 
 function renderActionDock(snapshot) {
   const player = snapshot.players.human;
@@ -365,13 +429,21 @@ function renderActionDock(snapshot) {
   const layout = JSON.stringify([quick.map(item => item.id), targeting, bioforge]);
   if (layout !== abilityLayout) {
     abilityLayout = layout;
-    actionDock.hidden = !(quick.length || targeting || bioforge);
-    actionDock.innerHTML = actionDock.hidden ? '' : `<h2>Abilities</h2><div class="quick-abilities">${quick.map(item =>
-      `<button type="button" data-${item.attribute}="${item.id}"${item.side ? ` data-side="${item.side}"` : ''}><span>${item.name}</span><small></small></button>`).join('')}</div>
-      ${targeting ? `<div class="action-group"><h3>Target priority</h3><div>${Object.entries(priorities).map(([id, label]) => `<button type="button" data-priority="${id}">${label}</button>`).join('')}</div></div>` : ''}
-      ${bioforge ? `<div class="action-group"><h3>Bioforge · Next available wave</h3><div>${Object.entries(contracts).map(([id, [label, cost]]) => `<button type="button" data-bioforge="${id}">${label} · ${cost} Flux</button>`).join('')}</div></div>` : ''}`;
+    const pages = [];
+    addPages(pages, 'Combat abilities', quick.map(item =>
+      `<button type="button" data-${item.attribute}="${item.id}"${item.side ? ` data-side="${item.side}"` : ''}><span>${item.name}</span><small></small></button>`));
+    if (targeting) addPages(pages, 'Target priority', Object.entries(priorities).map(([id, label]) =>
+      `<button type="button" data-priority="${id}">${label}</button>`));
+    if (bioforge) addPages(pages, 'Bioforge · Next available wave', Object.entries(contracts).map(([id, [label, cost]]) =>
+      `<button type="button" data-bioforge="${id}">${label} · ${cost} Flux</button>`));
+    actionDock.innerHTML = pages.map(({ title, items }) =>
+      `<section class="ability-page"><h3>${title}</h3><div>${items.join('')}</div></section>`).join('');
+    abilityPages = [...actionDock.children];
+    abilityButton.disabled = !pages.length;
+    if (abilityButton.disabled) abilityMenu.close();
+    showAbilityPage(0);
   }
-  actionDock.querySelectorAll('.quick-abilities button').forEach((button, index) => {
+  actionDock.querySelectorAll('button[data-action], button[data-active], button[data-ultimate], button[data-aim-ultimate]').forEach((button, index) => {
     const item = quick[index];
     const ready = item.remaining <= 0;
     button.disabled = !active || !ready;
@@ -406,9 +478,11 @@ actionDock.addEventListener('click', event => {
     trackMarkerVisible = true;
     showStatus('');
     render(match.snapshot());
-    canvas.focus();
+    abilityMenu.close();
+    canvas.focus({ preventScroll: true });
     return;
   } else if (ultimate) match.activateUltimate(ultimate, .5, side ?? 'left');
+  abilityMenu.close();
   const snapshot = match.snapshot();
   showStatus(priority ? `Target priority · ${priorities[priority]}` : snapshot.message);
   render(snapshot);
@@ -466,10 +540,68 @@ function drawAim() {
   context.restore();
 }
 
+const reconTitle = recon.querySelector('[data-recon-title]');
+const reconStrain = recon.querySelector('[data-recon-strain]');
+const reconSection = recon.querySelector('[data-recon-section]');
+const reconEntries = recon.querySelector('[data-recon-entries]');
+const reconPosition = recon.querySelector('[data-recon-position]');
+const reconPrevious = recon.querySelector('[data-recon-prev]');
+const reconNext = recon.querySelector('[data-recon-next]');
+let reconPages = [];
+let reconPage = 0;
+
+function showReconPage(page) {
+  reconPage = page;
+  const { title, items } = reconPages[page];
+  setText(reconSection, title);
+  if (reconEntries.children.length !== items.length) {
+    reconEntries.replaceChildren(...items.map(() => document.createElement('li')));
+  }
+  items.forEach((item, index) => setText(reconEntries.children[index], item));
+  reconPrevious.parentElement.hidden = reconPages.length < 2;
+  updatePager(reconPrevious, reconNext, reconPosition, page, reconPages.length);
+}
+
+reconPrevious.addEventListener('click', () => showReconPage(reconPage - 1));
+reconNext.addEventListener('click', () => showReconPage(reconPage + 1));
+
+function renderRecon(bot, level) {
+  const pages = [];
+  const rankList = values => Object.entries(values).filter(([, rank]) => rank).map(([id, rank]) => `${id} · Rank ${rank}`);
+  const addTelemetry = (title, items, empty = 'None') => addPages(pages, title, items.length ? items : [empty]);
+  addTelemetry('Bot purchases', [...bot.purchaseLog].reverse().map(entry => entry.label), 'The bot has not purchased yet.');
+  if (level >= 2) addTelemetry('Tier I', [...rankList(bot.tower), ...rankList(bot.mutations)]);
+  if (level >= 3) addTelemetry('Tier II', Object.values(bot.tier2).flatMap(rankList));
+  if (level >= 4) {
+    const composition = new Map();
+    for (const creep of bot.creeps) composition.set(creep.form, (composition.get(creep.form) ?? 0) + 1);
+    addTelemetry('Live composition', [...composition].map(([form, count]) => `${form} ×${count}`), 'No active Kethra');
+    addTelemetry('Cooldown telemetry', [...Object.entries(bot.activeCooldowns), ...Object.entries(bot.ultimateCooldowns)]
+      .map(([id, seconds]) => `${id} · ${Math.ceil(seconds)}s`));
+  }
+  if (level >= TIER2_MAX_LEVEL) addTelemetry('Ultimates', Object.values(bot.tier3).flatMap(choices =>
+    Object.keys(choices).filter(id => choices[id]).map(id => ultimateLabels[id])));
+  reconPages = pages;
+  setText(reconTitle, `Spectral Relay · Rank ${level}`);
+  setText(reconStrain, `Bot core strain ${bot.load} / ${bot.overloadCap}`);
+  showReconPage(Math.min(reconPage, pages.length - 1));
+}
+
+overview.addEventListener('showrecon', () => {
+  reconPage = 0;
+  render(latestSnapshot);
+});
+
 let snapshotTime = 0;
 let latestSnapshot = null;
 function render(snapshot) {
-  latestSnapshot = snapshot; snapshotTime = snapshot.time; context.clearRect(0, 0, canvas.width, canvas.height); arenaArt.drawBackground();
+  latestSnapshot = snapshot;
+  snapshotTime = snapshot.time;
+  context.resetTransform();
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  // Rotate the same world for wide arenas. Simulation and aiming keep their original coordinates.
+  if (horizontalArena) context.setTransform(0, -1, 1, 0, 0, WORLD_WIDTH);
+  arenaArt.drawBackground();
   const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot' && mode.value === 'versus', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
   drawSide(viewedPlayer, viewedSide, opponentView ? '#c99ce4' : '#e8bb79', visible); if (opponentView && !visible) drawFogOverlay(reconLevel, bot); if (visible) drawCritFloats(snapshot);
   drawAim();
@@ -479,11 +611,11 @@ function render(snapshot) {
   document.querySelector('#human-interest-rate').textContent = `${(human.interestRate * 100).toFixed(2)}% / 6s`;
   document.querySelector('#combat-damage').textContent = human.combat.damage.join('–'); document.querySelector('#combat-speed').textContent = `${human.combat.attackRate.toFixed(2)} / s`; document.querySelector('#combat-crit').textContent = `${(human.combat.criticalChance * 100).toFixed(1)}%`; document.querySelector('#combat-multiplier').textContent = typeof human.combat.criticalMultiplier === 'number' ? `${human.combat.criticalMultiplier}×` : human.combat.criticalMultiplier;
   const versus = mode.value === 'versus'; document.querySelectorAll('[data-bot-strain]').forEach((element) => { element.hidden = !versus || reconLevel < 1; }); document.querySelectorAll('[data-bot-economy]').forEach((element) => { element.hidden = !versus || reconLevel < TIER2_MAX_LEVEL; }); portraitMap.disabled = !versus; portraitMap.textContent = opponentView ? 'Your fortress' : 'Opponent';
-  recon.hidden = !versus || !reconLevel; if (versus && reconLevel) { const roots = [...Object.entries(bot.tower).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`), ...Object.entries(bot.mutations).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`)].join(', ') || 'none'; const specializations = Object.entries(bot.tier2).map(([root, choices]) => `${root}: ${Object.entries(choices).filter(([, value]) => value).map(([id, value]) => `${id} L${value}`).join(', ') || 'none'}`).join(' | '); const ultimates = Object.values(bot.tier3).flatMap((choices) => Object.entries(choices).filter(([, value]) => value).map(([id]) => id)).join(', ') || 'none'; const composition = bot.creeps.reduce((memo, creep) => { memo[creep.form] = (memo[creep.form] ?? 0) + 1; return memo; }, {}); const compositionText = Object.entries(composition).map(([form, count]) => `${form} ×${count}`).join(', ') || 'no active Kethra'; const cooldowns = [...Object.entries(bot.activeCooldowns).map(([id, value]) => `${id} ${Math.ceil(value)}s`), ...Object.entries(bot.ultimateCooldowns).map(([id, value]) => `${id} ${Math.ceil(value)}s`)].join(' · '); recon.innerHTML = `<h3>Spectral Relay rank ${reconLevel}</h3><p>Bot Core Strain: ${bot.load}/${bot.overloadCap}</p><p>${bot.purchaseLog.map((entry) => entry.label).join(' · ') || 'The bot has not purchased yet.'}</p>${reconLevel >= 2 ? `<p>Tier I: ${roots}</p>` : ''}${reconLevel >= 3 ? `<p>Tier II: ${specializations}</p>` : ''}${reconLevel >= 4 ? `<p>Live composition: ${compositionText}</p><p>Cooldown telemetry: ${cooldowns}</p>` : ''}${reconLevel >= TIER2_MAX_LEVEL ? `<p>Ultimates: ${ultimates}</p>` : ''}`; }
+  if (versus && reconLevel && overview.open && !recon.hidden) renderRecon(bot, reconLevel);
   renderFieldControls(snapshot, opponentView);
   upgradePanel.refresh(snapshot, running);
   renderActionDock(snapshot);
-  touchUi.refresh(versus, opponentView);
+  touchUi.refresh(versus, opponentView, versus && reconLevel > 0);
   result.hidden = !snapshot.result; result.textContent = snapshot.result ?? '';
 }
 function frame(now) {
@@ -502,7 +634,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 const fortressAtlas = document.querySelector('#fortress-atlas');
-const arenaArt = createArenaArt(context, canvas, routePoint, fortressAtlas);
+const arenaArt = createArenaArt(context, canvas, routePoint, fortressAtlas, drawLabel);
 const turrets = { human:createTurretMotion(), bot:createTurretMotion() };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const upgradePanel = createUpgradePanel({
@@ -522,4 +654,15 @@ const touchUi = createTouchUi({ openUpgrades, closeUpgrades: upgradePanel.close 
 fortressAtlas.addEventListener('load', () => {
   if (!running || paused) render(match.snapshot());
 });
+new ResizeObserver(([entry]) => {
+  const { width, height } = entry.contentRect;
+  const nextHorizontal = width > height * 1.05;
+  if (nextHorizontal === horizontalArena) return;
+  horizontalArena = nextHorizontal;
+  canvas.width = horizontalArena ? WORLD_HEIGHT : WORLD_WIDTH;
+  canvas.height = horizontalArena ? WORLD_WIDTH : WORLD_HEIGHT;
+  canvas.toggleAttribute('data-horizontal', horizontalArena);
+  render(latestSnapshot);
+}).observe(arenaWrap);
+
 setModeUi(); render(match.snapshot()); requestAnimationFrame(frame);

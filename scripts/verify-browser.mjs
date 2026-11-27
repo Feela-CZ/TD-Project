@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { FORTRESS } from '../web/turret-motion.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -31,8 +32,9 @@ async function capture(page, name) {
 }
 
 async function holdUpgrade(page, node, dialog, mobile) {
-  await node.scrollIntoViewIfNeeded();
   const box = await node.boundingBox();
+  const viewport = page.viewportSize();
+  assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height, 'upgrade must already fit in the viewport');
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
   if (mobile) {
     const cdp = await page.context().newCDPSession(page);
@@ -225,23 +227,25 @@ async function scenario(base, mobile, offline = false) {
     await press(start);
     assert.match(await active.textContent(), /Ready/);
     if (mobile) await capture(page, 'mobile');
+    await press(page.locator('[data-abilities]'));
     await press(active);
     assert.match(await active.textContent(), /Recharging · 4[78] s/);
     assert.equal(await active.isEnabled(), false);
     if (mobile) {
       await press(page.locator('[data-stats]'));
+      await press(page.locator('[data-view="match"]'));
       await press(page.locator('.overview-restart'));
     } else {
-      await press(page.locator('.match-settings > summary'));
+      await press(page.locator('[data-open-dialog="match-settings"]'));
       await press(page.locator('#restart'));
     }
     assert.equal(await flux(), 150);
     assert.equal(await active.count(), 0, 'restart must reset a purchased ability');
 
-    await press(page.locator('.match-settings > summary'));
+    await press(page.locator('[data-open-dialog="match-settings"]'));
     await page.locator('#mode').selectOption('versus');
-    await press(page.locator('.match-settings > summary'));
-    const opponent = page.locator(mobile ? '[data-rival]' : '#portrait-map');
+    await press(page.locator('#match-settings [data-close-dialog]'));
+    const opponent = page.locator('[data-rival]');
     assert.equal(await opponent.isEnabled(), true);
     await press(opponent);
     assert.equal(await page.locator('#portrait-map').textContent(), 'Your fortress');
@@ -360,6 +364,7 @@ async function verifyAiming(base) {
     const aim = page.locator('[data-aim-ultimate="orbitalBreach"]');
     const canvas = page.locator('#arena');
     const cancel = page.locator('#cancel-aim');
+    await page.locator('[data-abilities]').click();
     await aim.click();
     await cancel.waitFor();
     assert.match(await page.locator('#field-tip').textContent(), /pick a spot on the track/i);
@@ -367,11 +372,13 @@ async function verifyAiming(base) {
     await page.keyboard.press('Escape');
     assert.equal(await cancel.isVisible(), false);
     assert.match(await aim.textContent(), /Aim on track/);
+    await page.locator('[data-abilities]').click();
     await aim.click();
     const { width, height } = await canvas.boundingBox();
     await canvas.click({ position: { x: width / 2, y: height / 2 } });
     assert.equal(await cancel.isVisible(), true, 'clicking outside the track must not spend the ability');
     await cancel.click();
+    await page.locator('[data-abilities]').click();
     await aim.click();
     await page.keyboard.press('ArrowLeft');
     await page.keyboard.press('Enter');
@@ -385,6 +392,78 @@ async function verifyAiming(base) {
   }
 }
 
+async function verifyFixedViewports(base) {
+  const cases = [
+    { width: 320, height: 568, touch: true },
+    { width: 390, height: 667, touch: true },
+    { width: 667, height: 375, touch: true, landscape: true },
+    { width: 844, height: 390, touch: true, landscape: true },
+    { width: 1024, height: 600 },
+    { width: 1440, height: 900 },
+  ];
+  for (const { width, height, touch, landscape } of cases) {
+    const page = await browser.newPage({ viewport: { width, height }, hasTouch: touch, isMobile: touch });
+    const checkFit = async (label, selectors) => {
+      const failures = await page.evaluate(selectors => {
+        const overflow = [];
+        const root = document.scrollingElement;
+        if (root.scrollHeight > innerHeight + 1 || root.scrollWidth > innerWidth + 1 || scrollX || scrollY) {
+          overflow.push('document');
+        }
+        for (const selector of selectors) {
+          const element = document.querySelector(selector);
+          const rect = element.getBoundingClientRect();
+          if (!rect.width || !rect.height || rect.x < -.5 || rect.y < -.5 ||
+              rect.bottom > innerHeight + .5 || rect.right > innerWidth + .5 ||
+              element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1) {
+            overflow.push(selector);
+          }
+        }
+        return overflow;
+      }, selectors);
+      assert.deepEqual(failures, [], `${width}×${height} ${label} must fit without scrolling`);
+    };
+    try {
+      await page.goto(base);
+      const arena = page.locator('#arena');
+      if (landscape) await page.locator('#arena[data-horizontal]').waitFor();
+      await checkFit('battlefield', ['main', '#arena', '.game-toolbar']);
+      const field = await arena.boundingBox();
+      await page.mouse.move(field.x + field.width / 2, field.y + field.height / 2);
+      await page.mouse.wheel(500, 500);
+      await checkFit('after wheel', ['main', '#arena']);
+      if (landscape) {
+        const world = await arena.evaluate(element => ({ width: element.width, height: element.height }));
+        await arena.click({ position: { x: field.width * FORTRESS.y / world.width, y: field.height * (world.height - FORTRESS.x) / world.height } });
+        await page.locator('#upgrade-sheet[open]').waitFor();
+      } else await page.locator('[data-open]').click();
+      await checkFit('upgrades', ['#upgrade-panel', '.upgrade-tree', '.upgrade-detail']);
+      for (const branch of [1, 2, 0]) {
+        await page.locator(`[data-group="${branch}"]`).click();
+        await checkFit('upgrade branch', ['#upgrade-panel', '.upgrade-tree']);
+      }
+      await page.locator('[data-node="damage"]').press('Shift+Enter');
+      await checkFit('upgrade description', ['#upgrade-description', '.upgrade-description-body']);
+      await page.keyboard.press('Escape');
+      if (await page.locator('#upgrade-sheet').isVisible()) await page.keyboard.press('Escape');
+      await page.locator('[data-stats]').click();
+      for (const section of ['income', 'match', 'combat']) {
+        await page.locator(`[data-view="${section}"]`).click();
+        await checkFit(`stats ${section}`, ['#match-overview', `[data-screen="${section}"]`]);
+      }
+      await page.keyboard.press('Escape');
+      await page.locator('[data-open-dialog="match-settings"]').click();
+      await page.locator('#mode').selectOption('versus');
+      await checkFit('versus settings', ['#match-settings', '#bot-profile', '#restart']);
+      await page.keyboard.press('Escape');
+      await checkFit('versus battlefield', ['main', '#arena', '[data-rival]']);
+    } finally {
+      await page.close();
+    }
+  }
+  console.log('PASS: battlefield, upgrades, descriptions, stats and settings fit six viewports without scrolling.');
+}
+
 try {
   const base = await serverUrl();
   if (output) await mkdir(output, { recursive:true });
@@ -392,6 +471,7 @@ try {
   assert.equal((await fetch(`${base}/scripts/`)).status, 404, 'directories other than the game index are not streamed');
   assert.equal((await fetch(`${base}/web/art/fortress-atlas.webp`, { method: 'HEAD' })).headers.get('content-type'), 'image/webp');
   browser = await chromium.launch({ executablePath: process.env.KETHRA_BROWSER || undefined });
+  await verifyFixedViewports(base);
   await scenario(base, false);
   await scenario(base, true);
   await verifyTurretArt(base);

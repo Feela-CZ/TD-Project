@@ -1,50 +1,57 @@
 export function createTouchUi({ openUpgrades, closeUpgrades }) {
   const toolbar = document.querySelector('.game-toolbar');
   const upgradeButton = toolbar.querySelector('[data-open]');
-  const statsButton = toolbar.querySelector('[data-stats]');
   const rival = toolbar.querySelector('[data-rival]');
-  const overview = document.querySelector('.left-panel');
-  const phone = matchMedia('(max-width: 760px)');
+  const overview = document.querySelector('#match-overview');
+  const sections = [...overview.querySelectorAll('[data-screen]')];
+  const tabs = [...overview.querySelectorAll('[data-view]')];
+  const reconTab = overview.querySelector('[data-view="recon"]');
+  const desktop = matchMedia('(min-width: 1120px) and (min-height: 660px)');
 
-  function setOverview(open) {
-    document.body.classList.toggle('overview-open', open);
-    statsButton.setAttribute('aria-expanded', String(open));
+  function showOverviewSection(view) {
+    for (const tab of tabs) tab.setAttribute('aria-pressed', String(tab.dataset.view === view));
+    for (const section of sections) section.hidden = section.dataset.screen !== view;
   }
 
   function layout() {
-    setOverview(false);
-    if (phone.matches) upgradeButton.setAttribute('aria-haspopup', 'dialog');
-    else upgradeButton.removeAttribute('aria-haspopup');
+    if (desktop.matches) upgradeButton.removeAttribute('aria-haspopup');
+    else upgradeButton.setAttribute('aria-haspopup', 'dialog');
   }
 
-  upgradeButton.addEventListener('click', () => {
-    setOverview(false);
-    openUpgrades();
+  for (const button of document.querySelectorAll('[data-open-dialog]')) {
+    const dialog = document.getElementById(button.dataset.openDialog);
+    button.addEventListener('click', () => {
+      closeUpgrades();
+      if (dialog === overview) showOverviewSection('combat');
+      dialog.showModal();
+    });
+    dialog.querySelector('[data-close-dialog]').addEventListener('click', () => dialog.close());
+  }
+
+  overview.addEventListener('click', event => {
+    const tab = event.target.closest('[data-view]');
+    if (tab) {
+      showOverviewSection(tab.dataset.view);
+      if (tab === reconTab) overview.dispatchEvent(new Event('showrecon'));
+    }
   });
-  rival.addEventListener('click', () => {
-    closeUpgrades();
-    document.querySelector('#portrait-map').click();
-  });
-  statsButton.addEventListener('click', () => {
-    closeUpgrades();
-    setOverview(true);
-    overview.querySelector('.overview-close').focus();
-  });
-  overview.querySelector('.overview-close').addEventListener('click', () => {
-    setOverview(false);
-    statsButton.focus();
-  });
-  overview.querySelector('.overview-restart').addEventListener('click', () => {
-    setOverview(false);
+  document.querySelector('.overview-restart').addEventListener('click', () => {
+    overview.close();
     document.querySelector('#restart').click();
   });
-  phone.addEventListener('change', layout);
+  upgradeButton.addEventListener('click', openUpgrades);
+  rival.addEventListener('click', () => document.querySelector('#portrait-map').click());
+  desktop.addEventListener('change', layout);
   layout();
 
-  function refresh(versus, opponentView) {
+  function refresh(versus, opponentView, reconAvailable) {
     rival.hidden = !versus;
     const label = opponentView ? 'Own fortress' : 'Opponent';
     if (rival.textContent !== label) rival.textContent = label;
+    if (!reconAvailable && !reconTab.hidden && reconTab.getAttribute('aria-pressed') === 'true') {
+      showOverviewSection('combat');
+    }
+    reconTab.hidden = !reconAvailable;
   }
   return { refresh };
 }
