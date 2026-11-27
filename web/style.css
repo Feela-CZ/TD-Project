@@ -141,6 +141,7 @@ canvas { display: block; width: 100%; height: auto; touch-action: pan-y; }
 .tree-node small { color: var(--tier); font-size: .7rem; font-variant-numeric: tabular-nums; }
 .tree-node[data-locked] { background: color-mix(in srgb, var(--tint) 49%, var(--surface)); color: #c4ccd7; }
 .tree-node[data-locked] small { color: var(--muted); }
+.tree-node[data-unaffordable] small { color: #f0c38e; }
 .tree-node[data-tree-root] { border-color: var(--tier); }
 .tree-node[data-owned] { border-color: color-mix(in srgb, var(--tier) 73%, #273241); }
 .tree-node[aria-pressed="true"],.tree-node:hover:not(:disabled) {

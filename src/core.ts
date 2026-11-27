@@ -31,12 +31,13 @@ export const RULES = Object.freeze({
 export const TIER1_MAX_LEVEL = 9;
 export const TIER2_MAX_LEVEL = 5;
 export const ORDNANCE_DAMAGE_PER_RANK = .05;
-// Kill rewards deliberately use whole Flux. The bands raise late-game income
-// without making the opening less legible or turning Reserves into the only
-// viable source of progression.
+// Base kill rewards use whole Flux. The live economy carries fractional
+// bonuses forward, including each additional rank of Control Nexus.
 export const KILL_FLUX_BY_WAVE_BAND = Object.freeze([8, 9, 11, 13, 16, 20]);
 /** @param {number} level */
-export function controlNexusRewardFloor(level) { return Math.min(5, 2 + Math.ceil(Math.max(0, level) / 3)); }
+export function controlNexusRewardFloor(level) {
+  return level <= 0 ? 2 : 3 + (Math.min(TIER1_MAX_LEVEL, level) - 1) * .25;
+}
 /** @param {number} wave */
 export function baseKillFluxForWave(wave) { return KILL_FLUX_BY_WAVE_BAND[Math.min(KILL_FLUX_BY_WAVE_BAND.length - 1, Math.max(0, Math.floor((wave - 1) / 10)))]; }
 /** @param {number} wave @param {number} completedLaps @param {number} [controlNexusLevel] */

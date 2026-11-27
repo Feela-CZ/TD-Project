@@ -1,5 +1,5 @@
-import { UPGRADE_GROUPS, TIER2_FAMILIES, TIER3_FAMILIES, TIER1_MAX_LEVEL, TIER2_MAX_LEVEL } from '../dist/live.mjs';
-import { upgradeCost, upgradeBlock } from './upgrade-state.mjs';
+import { UPGRADE_GROUPS, TIER2_FAMILIES, TIER3_FAMILIES, TIER1_MAX_LEVEL, TIER2_MAX_LEVEL, controlNexusRewardFloor } from '../dist/live.mjs';
+import { upgradeAvailability } from './upgrade-state.mjs';
 import { BASIC_UPGRADES, UPGRADE_EFFECTS, ULTIMATE_DETAILS } from './upgrade-copy.mjs';
 
 const makeBasic = ([id, label]) => ({ id, label, tier: 1, max: TIER1_MAX_LEVEL });
@@ -59,7 +59,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   }
 
   function availability(offer, level = rank(offer), active = running) {
-    return upgradeBlock(snapshot, {
+    return upgradeAvailability(snapshot, {
       tier: offer.tier,
       root: offer.tier === 1 ? offer.id : currentRoot(),
       choice: offer.choice,
@@ -69,8 +69,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     });
   }
 
-  function priceLabel(offer) {
-    const price = upgradeCost(player(), offer.tier, offer.id);
+  function priceLabel(price) {
     return price === 0 ? 'Free' : price === null ? '—' : `${price} Flux`;
   }
 
@@ -126,9 +125,16 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     specializationLinks.append(trunk);
   }
 
-  function updateDetail(offer, level, reason) {
-    text(cost, level === offer.max ? '' : reason || priceLabel(offer));
+  function updateDetail(offer, level, availability) {
+    const { locked, missingFlux, price, reason } = availability;
+    const label = priceLabel(price);
+    text(cost, level === offer.max ? '' : locked ? reason : missingFlux ? `${label} · ${reason}` : label);
     cost.toggleAttribute('data-buyable', !reason);
+    if (offer.id === 'rewardFloor') {
+      const floor = controlNexusRewardFloor(level);
+      const next = level === offer.max ? '' : ` → ${controlNexusRewardFloor(level + 1)}`;
+      text(effect, `Minimum kill reward ${floor}${next} Flux`);
+    }
   }
 
   function refresh(nextSnapshot, active) {
@@ -138,21 +144,22 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     text(balance, `${Math.floor(player().energy)} Flux`);
     for (const [id, { button, status, offer }] of nodes) {
       const level = rank(offer);
-      const reason = availability(offer, level, true);
+      const state = availability(offer, level, true);
       const isSelected = id === selected;
       if (button.getAttribute('aria-pressed') !== String(isSelected)) button.setAttribute('aria-pressed', String(isSelected));
-      if (isSelected) button.setAttribute('aria-describedby', 'selected-upgrade-description');
+      if (isSelected) button.setAttribute('aria-describedby', 'selected-upgrade-description selected-upgrade-cost');
       else button.removeAttribute('aria-describedby');
       button.toggleAttribute('data-tree-root', offer.tier === 1 && id === currentRoot());
       button.toggleAttribute('data-owned', level > 0);
-      button.toggleAttribute('data-locked', !level && Boolean(reason));
-      button.toggleAttribute('data-ready', isSelected && running && !reason);
+      button.toggleAttribute('data-locked', !level && state.locked);
+      button.toggleAttribute('data-unaffordable', state.missingFlux > 0);
+      button.toggleAttribute('data-ready', isSelected && running && !state.reason);
       const label = level === offer.max ? (offer.tier === 3 ? 'Unlocked' : 'Max rank')
-        : level ? `${level} / ${offer.max}` : reason ? 'Locked' : priceLabel(offer);
+        : level ? `${level} / ${offer.max}` : state.locked ? 'Locked' : priceLabel(state.price);
       text(status, label);
       edges.get(id)?.toggleAttribute('data-owned', level > 0);
       edges.get(id)?.toggleAttribute('data-selected', isSelected);
-      if (isSelected) updateDetail(offer, level, reason);
+      if (isSelected) updateDetail(offer, level, state);
     }
     specializationLinks.toggleAttribute('data-owned', paths.some(offer => rank(offer) > 0));
   }
@@ -248,8 +255,9 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   function buy(offer) {
     const previous = rank(offer);
-    if (availability(offer, previous)) return;
-    const price = priceLabel(offer);
+    const state = availability(offer, previous);
+    if (state.reason) return;
+    const price = priceLabel(state.price);
     const error = purchase(offer.tier, currentRoot(), offer.id);
     const level = rank(offer);
     if (level === previous) {

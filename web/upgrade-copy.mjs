@@ -6,7 +6,7 @@ export const BASIC_UPGRADES = {
   speed: { effect: 'Kethra sent to the opposing fortress move faster.', details: 'Applies to newly spawned Kethra. At rank 9, their base movement speed is 30% higher.' },
   maxHp: { effect: 'Kethra sent to the opposing fortress gain health.', details: 'Applies to newly spawned Kethra. At rank 9, they have 30% more base health.' },
   interest: { effect: 'Earn more interest on unspent Flux every 6 seconds.', details: 'The normal payout rises from 0.25% to 0.80% of your balance per tick. Fractions carry over until they add up to a whole Flux.' },
-  rewardFloor: { effect: 'Kethra that survive several laps are worth more Flux when killed.', details: 'Each completed lap reduces the base reward by 25%. This upgrade raises the minimum from 2 Flux to 3 at ranks 1–3, 4 at ranks 4–6 and 5 at ranks 7–9.' },
+  rewardFloor: { effect: 'Kethra that survive several laps are worth more Flux when killed.', details: 'Each completed lap reduces the base reward by 25%. Rank 1 raises the minimum from 2 to 3 Flux. Each further rank adds 0.25 Flux, up to 5 at rank 9. Fractional Flux carries over to later kills.' },
   overdrive: { effect: 'Unlock a button that makes the cannon fire faster and shoot extra rounds for 4 seconds.', details: 'At rank 1, each volley can hit 2 targets. At rank 9, it can hit up to 4 at 2.5× the normal firing rate. Recharges in 120 seconds.' }
 };
 

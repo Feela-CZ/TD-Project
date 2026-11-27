@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FORTRESS } from '../web/turret-motion.mjs';
+import { ULTIMATE_COST } from '../dist/live.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -235,7 +236,7 @@ async function scenario(base, mobile, offline = false) {
     if (!offline) await capture(page, mobile ? 'mobile-upgrades' : 'desktop-upgrades');
 
     await press(node('salvo'));
-    assert.match(await cost(), /^Need \d+ more Flux\.$/);
+    assert.match(await cost(), /^\d+ Flux · Need \d+ more Flux\.$/);
     assert.equal(await level('salvo'), '2 / 5', 'every additional tap buys the next rank');
     assert.equal(before - await flux(), 128, 'each of the two ranks is charged exactly once');
     const remaining = await flux();
@@ -405,7 +406,17 @@ async function verifyAiming(base) {
     }
     const orbital = page.locator('[data-node="orbitalBreach"]');
     const edge = page.locator('[data-link="orbitalBreach"]');
+    await page.evaluate(() => { window.aimingTestMatch.players.human.energy = 100; });
+    await page.waitForFunction(() => document.querySelector('[data-node="orbitalBreach"]').hasAttribute('data-unaffordable'));
     await orbital.click();
+    assert.equal(await orbital.getAttribute('data-locked'), null, 'an eligible Ultimate short on Flux is not locked');
+    assert.equal(await orbital.locator('small').textContent(), `${ULTIMATE_COST} Flux`);
+    assert.match(await page.locator('[data-upgrade-cost]').textContent(), /Need \d+ more Flux/);
+    await orbital.click();
+    assert.equal(await orbital.getAttribute('data-owned'), null);
+    assert.equal(await page.evaluate(() => window.aimingTestMatch.players.human.energy), 100);
+    await page.evaluate(cost => { window.aimingTestMatch.players.human.energy = cost; }, ULTIMATE_COST);
+    await page.waitForFunction(() => !document.querySelector('[data-node="orbitalBreach"]').hasAttribute('data-unaffordable'));
     assert.equal(await edge.getAttribute('data-owned'), null);
     assert.equal(await page.locator('[data-aim-ultimate="orbitalBreach"]').count(), 0);
     await orbital.click();
@@ -441,6 +452,16 @@ async function verifyAiming(base) {
     assert.match(await aim.locator('small').textContent(), /^\d+ s$/);
     const progress = await page.evaluate(() => window.aimingTestMatch.players.human.breachScars[0].progress);
     assert.equal(progress, .48, 'the cast must land at the selected track position');
+    await page.evaluate(() => {
+      window.aimingTestMatch.players.human.tower.rewardFloor = 8;
+      window.aimingTestMatch.players.human.energy = 10000;
+    });
+    const nexus = page.locator('[data-node="rewardFloor"]');
+    await nexus.click();
+    assert.equal(await page.locator('[data-upgrade-effect]').textContent(), 'Minimum kill reward 4.75 → 5 Flux');
+    await nexus.click();
+    assert.equal(await nexus.locator('small').textContent(), 'Max rank');
+    assert.equal(await page.locator('[data-upgrade-effect]').textContent(), 'Minimum kill reward 5 Flux');
     console.log('PASS: keyboard and Tier III purchases, exact Ultimate link, and targeted ability aim, cancel and cast.');
   } finally {
     await page.close();

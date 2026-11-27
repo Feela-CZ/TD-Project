@@ -4,7 +4,7 @@ export function upgradeCost(player, tier, id) {
   return tier === 1 ? player.nextTier1Cost : tier === 2 ? player.nextTier2Cost : id === 'avariceEngine' ? 0 : ULTIMATE_COST;
 }
 
-export function upgradeBlock(state, { tier, root, choice, groupIndex, item, running }) {
+function upgradeLock(state, { tier, root, choice, groupIndex, item, running }) {
   const p=state.players.human, group=UPGRADE_GROUPS[groupIndex];
   if (item.level >= item.max) return 'Maximum rank';
   if (tier===1 && !item.level && group.nodes.filter(([id])=>(id in p.tower?p.tower:p.mutations)[id]>0).length>=2) return 'You can unlock two basic upgrades per category.';
@@ -18,8 +18,18 @@ export function upgradeBlock(state, { tier, root, choice, groupIndex, item, runn
   }
   if(state.result) return 'Match finished';
   if(!running) return 'Start the match to buy upgrades.';
-  const price=upgradeCost(p,tier,item.id);
-  if(price===null) return 'No upgrades available';
-  if(p.energy<price) return `Need ${Math.ceil(price - p.energy)} more Flux.`;
   return '';
+}
+
+export function upgradeAvailability(state, offer) {
+  const player = state.players.human;
+  const price = upgradeCost(player, offer.tier, offer.item.id);
+  const lock = upgradeLock(state, offer) || (price === null ? 'No upgrades available' : '');
+  const missingFlux = lock ? 0 : Math.max(0, Math.ceil(price - player.energy));
+  const reason = lock || (missingFlux > 0 ? `Need ${missingFlux} more Flux.` : '');
+  return { price, locked: Boolean(lock), missingFlux, reason };
+}
+
+export function upgradeBlock(state, offer) {
+  return upgradeAvailability(state, offer).reason;
 }

@@ -31,7 +31,11 @@ assert.equal(authoredCreepHp(30), 379, 'the live client must share approved +11 
 assert.deepEqual([1, 11, 21, 31, 41, 51].map((wave) => killFluxForCreep(wave, 0)), [8, 9, 11, 13, 16, 20], 'first-lap kill Flux must use the approved whole-number wave bands');
 assert.deepEqual([0, 1, 2, 3].map((lap) => killFluxForCreep(1, lap)), [8, 6, 4, 3], 'early Kethra rewards must decay proportionally by completed lap');
 assert.deepEqual([0, 1, 2, 3].map((lap) => killFluxForCreep(60, lap)), [20, 15, 11, 8], 'late Kethra rewards must lose meaningful Flux on every completed lap');
-assert.equal(killFluxForCreep(60, 99, TIER1_MAX_LEVEL), 5, 'Control Nexus must retain a whole-number late-lap reward floor');
+assert.deepEqual(
+  Array.from({ length: TIER1_MAX_LEVEL + 1 }, (_, rank) => killFluxForCreep(60, 99, rank)),
+  [2, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5],
+  'every Control Nexus rank must improve the late-lap reward floor'
+);
 assert.deepEqual(bossIncursionForWave(5), { id: 'carapace', label: 'Carapace', armor: 1, speed: 0, hp: 0 }, 'Wave 5 must begin the Boss Incursion rotation with Carapace');
 assert.deepEqual(bossIncursionForWave(60), { id: 'apex-prime', label: 'Apex Prime', armor: 4, speed: .25, hp: .40 }, 'Wave 60 must carry the final combined Boss Incursion profile');
 const liveTotals = first.snapshot();
@@ -155,6 +159,57 @@ tempo.step(0.05);
 assert.ok(tempo.waveSpawns.bot[2] >= 1, 'the queued bot Incursion must begin as soon as its current deployment completes');
 assert.equal(tempo.waveSpawns.human[2], 0, 'Tempo Charge must not add an extra Incursion to the player’s field');
 
+const tracking = new LiveMatch(108, { botEnabled: false });
+advance(tracking, .05);
+tracking.waveSpawns.human[1] = RULES.creepsPerWave;
+const tracker = tracking.players.human;
+const lead = tracker.creeps[0];
+Object.assign(lead, { progress: .48, hp: 1000, maxHp: 1000, baseSpeed: 0 });
+const challenger = structuredClone(lead);
+Object.assign(challenger, { id: 2, progress: .41 });
+tracker.creeps.push(challenger);
+tracker.tower.attackSpeed = 1;
+tracker.tier2.attackSpeed.rhythm = 5;
+const standingRate = tracking.snapshot().players.human.combat.attackRate;
+
+function nextTrackingShot() {
+  const fired = tracker.shots;
+  for (let i = 0; i < 40 && tracker.shots === fired; i++) tracking.step(.05);
+  assert.ok(tracker.shots > fired, 'the cannon must fire at an eligible target');
+  return tracker.projectiles.at(-1).targetId;
+}
+
+assert.equal(nextTrackingShot(), lead.id, 'automatic targeting acquires the enemy nearest the sector center');
+challenger.progress = .5;
+assert.equal(nextTrackingShot(), lead.id, 'a new enemy nearer the center cannot steal an eligible target');
+assert.equal(tracker.rhythmStacks, 2, 'consecutive shots build Combat Rhythm');
+lead.progress = .8;
+assert.equal(nextTrackingShot(), challenger.id, 'leaving the sector ends the target lock');
+assert.equal(tracker.rhythmStacks, 3, 'changing target while firing retains Combat Rhythm');
+challenger.hp = 0;
+lead.progress = .49;
+assert.equal(nextTrackingShot(), lead.id, 'a killed enemy is replaced on the next shot');
+
+const alternate = { ...structuredClone(lead), id: 3, progress: .51 };
+tracker.creeps.push(alternate);
+tracker.signalUntil = tracking.time + 6;
+assert.equal(nextTrackingShot(), alternate.id, 'Signal Corruption can still force an alternate target');
+assert.equal(nextTrackingShot(), lead.id, 'Signal Corruption still alternates valid targets');
+
+lead.progress = alternate.progress = .8;
+advance(tracking, 2.1);
+assert.equal(tracking.snapshot().players.human.combat.attackRate, standingRate, 'expired rhythm must not inflate the HUD or next firing interval');
+alternate.progress = .5;
+assert.equal(nextTrackingShot(), alternate.id);
+assert.equal(tracker.rhythmStacks, 1, 'firing after a break starts a new rhythm');
+
+tracker.signalUntil = -Infinity;
+tracker.tier3.rewardFloor.commandOverride = 1;
+tracking.setPriority('manual');
+lead.progress = .49;
+tracking.setManualTarget(lead.id);
+assert.equal(nextTrackingShot(), lead.id, 'manual targeting overrides the prior automatic target');
+
 function staticFixture(seed, emergency = 0) {
   const match = new LiveMatch(seed); advance(match, 0.05);
   const player = match.players.human; const primary = player.creeps[0];
@@ -230,6 +285,19 @@ function fluxFromFirstKill(multiplier) {
 }
 assert.equal(fluxFromFirstKill(1), killFluxForCreep(1, 0), 'the default live reward must match the browser rules');
 assert.equal(fluxFromFirstKill(2), fluxFromFirstKill(1) * 2, 'a simulation reward override must actually affect kill Flux');
+
+function fourLateLapKills(rank) {
+  const match = new LiveMatch(109, { botEnabled: false });
+  advance(match, .05);
+  const player = match.players.human;
+  player.tower.rewardFloor = rank;
+  const sample = player.creeps[0];
+  player.creeps = Array.from({ length: 4 }, (_, index) =>
+    ({ ...structuredClone(sample), id: index + 1, completedLaps: 99, hp: 0 }));
+  advance(match, .05);
+  return match.snapshot().players.human.earnedEnergy;
+}
+assert.deepEqual([7, 8, 9].map(fourLateLapKills), [18, 19, 20], 'fractional Nexus bonuses must carry through real kill payouts');
 
 const economy = new LiveMatch(10);
 advance(economy, 18.05);
