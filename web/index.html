@@ -21,7 +21,6 @@
             <button type="button" data-open aria-controls="upgrade-panel">Upgrades</button>
             <button type="button" data-rival hidden>Opponent</button>
             <button type="button" data-stats data-open-dialog="match-overview" aria-haspopup="dialog">Stats</button>
-            <button type="button" data-abilities data-open-dialog="ability-menu" aria-haspopup="dialog" disabled>Abilities</button>
           </nav>
           <section class="portrait-hud" aria-label="Match at a glance">
             <div><span>Flux</span><strong id="portrait-flux">150</strong></div>
@@ -29,11 +28,15 @@
             <div><span id="strain-label">Core strain</span><strong id="overload">0 / 100</strong><progress id="strain-meter" value="0" max="100" aria-labelledby="strain-label"></progress></div>
           </section>
           <section class="arena-wrap">
-            <canvas id="arena" width="420" height="700" tabindex="-1" aria-label="Fortress battlefield">Your browser does not support Canvas.</canvas>
-            <img id="fortress-atlas" src="art/fortress-atlas.webp" alt="" hidden fetchpriority="high">
-            <button id="cancel-aim" type="button" hidden>Cancel aim</button>
-            <p id="status" class="status" role="status" hidden></p>
-            <div id="result" class="result" hidden></div>
+            <img class="arena-terrain" src="art/kethra-terrain.webp" alt="" fetchpriority="high">
+            <div class="arena-playfield">
+              <canvas id="arena" width="420" height="700" tabindex="-1" aria-label="Fortress battlefield">Your browser does not support Canvas.</canvas>
+              <img id="fortress-atlas" src="art/fortress-atlas.webp" alt="" hidden fetchpriority="high">
+              <button id="cancel-aim" type="button" hidden>Cancel aim</button>
+              <p id="status" class="status" role="status" hidden></p>
+              <div id="result" class="result" hidden></div>
+            </div>
+            <section id="action-dock" class="action-dock" aria-label="Active abilities" hidden></section>
           </section>
           <section class="field-actions" aria-label="Combat controls">
             <button id="portrait-tempo" type="button" disabled hidden>Send next wave early</button>
@@ -125,15 +128,10 @@
           </section>
         </div>
       </dialog>
-      <dialog class="game-dialog" id="ability-menu" aria-labelledby="ability-title">
+      <dialog class="game-dialog" id="ability-options" aria-labelledby="ability-title">
         <div class="dialog-layout">
-          <header class="dialog-header"><h2 id="ability-title">Abilities</h2><button type="button" data-close-dialog autofocus>Close</button></header>
-          <section id="action-dock" class="action-dock" aria-label="Unlocked abilities"></section>
-          <nav class="dialog-pagination" aria-label="Ability pages" hidden>
-            <button type="button" data-ability-prev>Previous</button>
-            <span data-ability-position></span>
-            <button type="button" data-ability-next>Next</button>
-          </nav>
+          <header class="dialog-header"><h2 id="ability-title"></h2><button type="button" data-close-ability-options autofocus>Close</button></header>
+          <div class="ability-options-list"></div>
         </div>
       </dialog>
     </main>

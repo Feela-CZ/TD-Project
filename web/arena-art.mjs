@@ -9,93 +9,7 @@ const barrelHeight = 88;
 // The upper six texels are transparent padding in the barrel tile.
 const barrelTop = -BARREL_REACH - 6 * barrelHeight / fortressSprites.barrel[3];
 
-const edge = '#080b0a';
-
-function sample(seed) {
-  const value = Math.imul(seed ^ 0x9e3779b9, 0x45d9f3b);
-  return ((value ^ (value >>> 16)) >>> 0) / 0x100000000;
-}
-
-function rock(ctx, x, y, size, key) {
-  const face = new Path2D();
-  for (let i = 0; i < 6; i++) {
-    const a = i * Math.PI / 3;
-    const r = size * (.62 + sample(key + i * 11) * .43);
-    const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * .67;
-    if (i === 0) face.moveTo(px, py);
-    else face.lineTo(px, py);
-  }
-  face.closePath();
-  ctx.fillStyle = edge;
-  ctx.save();
-  ctx.translate(2, 4);
-  ctx.fill(face);
-  ctx.restore();
-  ctx.fillStyle = ['#292d29', '#34352c', '#272e2e', '#30352d'][key % 4];
-  ctx.fill(face);
-  ctx.strokeStyle = '#51594b68';
-  ctx.lineWidth = .65;
-  ctx.stroke(face);
-  ctx.beginPath();
-  ctx.moveTo(x - size * .69, y);
-  ctx.lineTo(x - size * .17, y - size * .24);
-  ctx.lineTo(x + size * .29, y - size * .27);
-  ctx.lineTo(x + size * .65, y);
-  ctx.stroke();
-}
-
-function paintTerrain(width, height) {
-  const tile = document.createElement('canvas');
-  tile.width = width;
-  tile.height = height;
-  const ctx = tile.getContext('2d');
-  const ground = ctx.createRadialGradient(206, 410, 30, 206, 410, 380);
-  ground.addColorStop(0, '#252925');
-  ground.addColorStop(.65, '#151c19');
-  ground.addColorStop(1, '#0a1110');
-  ctx.fillStyle = ground;
-  ctx.fillRect(0, 0, width, height);
-
-  for (let n = 0; n < 2300; n++) {
-    const x = width * sample(n * 3 + 1), y = height * sample(n * 3 + 2);
-    ctx.fillStyle = n % 3 ? '#9aac7e19' : '#c8ab733c';
-    ctx.fillRect(x, y, .3 + sample(n * 3 + 3) * 2, .6);
-  }
-  for (let row = 0; row < 20; row++) {
-    for (let column = 0; column < 14; column++) {
-      const index = row * 14 + column;
-      const x = column * 32 + (row % 2 ? 15 : 0) + sample(index + 391) * 12;
-      const y = row * 36 + sample(index + 781) * 17;
-      const rim = x < 43 || x > 378 || y < 103 || y > 654;
-      const spine = Math.abs(x - (211 + Math.sin(row * .55) * 27)) < 33 && y > 185 && y < 516;
-      if (rim || spine || sample(index + 2563) > .82) rock(ctx, x, y, rim ? 23 : 13, index);
-    }
-  }
-
-  ctx.lineWidth = 1.25;
-  for (const [x, y] of [[22, 168], [403, 256], [18, 519], [393, 522], [254, 256], [157, 435], [225, 655]]) {
-    const heat = ctx.createRadialGradient(x, y, 0, x, y, 38);
-    heat.addColorStop(0, '#d3683c59'); heat.addColorStop(1, '#d3683c00');
-    ctx.fillStyle = heat;
-    ctx.fillRect(x - 38, y - 38, 76, 76);
-    ctx.beginPath();
-    ctx.moveTo(x - 27, y + 6);
-    ctx.lineTo(x - 11, y - 3);
-    ctx.lineTo(x - 3, y + 3);
-    ctx.lineTo(x + 8, y - 7);
-    ctx.lineTo(x + 22, y - 12);
-    ctx.strokeStyle = '#e192597a';
-    ctx.stroke();
-  }
-
-  ctx.strokeStyle = '#9caa7f40';
-  ctx.setLineDash([19, 5, 2, 5]);
-  ctx.strokeRect(12, 81, width - 24, height - 99);
-  return tile;
-}
-
-export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
-  const terrain = paintTerrain(canvas.width, canvas.height);
+export function createArenaArt(ctx, routePoint, fortressAtlas) {
   function route(from, to) {
     const path = new Path2D();
     for (let i = 0; i <= 100; i++) {
@@ -233,5 +147,5 @@ export function createArenaArt(ctx, canvas, routePoint, fortressAtlas) {
     }
   }
 
-  return { drawBackground: () => ctx.drawImage(terrain, 0, 0), drawTrack, drawTower };
+  return { drawTrack, drawTower };
 }

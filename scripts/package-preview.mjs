@@ -22,14 +22,15 @@ async function include(file) {
 }
 
 const entry = await include(resolve(project, 'web', 'app.mjs'));
-const spritePath = 'art/fortress-atlas.webp';
-const [template, style, mobile, sprites] = await Promise.all([
+const art = ['art/fortress-atlas.webp', 'art/kethra-terrain.webp'];
+const [template, style, mobile, ...images] = await Promise.all([
   ...['index.html', 'style.css', 'mobile.css'].map(name => readFile(resolve(project, 'web', name), 'utf8')),
-  readFile(resolve(project, 'web', spritePath))
+  ...art.map(name => readFile(resolve(project, 'web', name)))
 ]);
-const document = template
+const inlineArt = art.reduce((html, name, index) =>
+  html.replace(`src="${name}"`, `src="data:image/webp;base64,${images[index].toString('base64')}"`), template);
+const document = inlineArt
   .replace('    <link rel="stylesheet" href="style.css">\n    <link rel="stylesheet" href="mobile.css">', `    <style>\n${style}\n${mobile}\n    </style>`)
-  .replace(`src="${spritePath}"`, `src="data:image/webp;base64,${sprites.toString('base64')}"`)
   .replace('<script type="module" src="app.mjs"></script>', `<script type="importmap">${JSON.stringify({ imports })}</script>\n    <script type="module">import "${entry}";</script>`);
 const destination = resolve(process.argv[2] || 'release-web/Kethra_Incursion_Playtest.html');
 await mkdir(dirname(destination), { recursive: true });

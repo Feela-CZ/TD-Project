@@ -22,12 +22,13 @@ const stage = document.querySelector('.game-stage');
 const mapNav = document.querySelector('#map-nav');
 const swipeMap = document.querySelector('#swipe-map');
 const actionDock = document.querySelector('#action-dock');
-const abilityMenu = document.querySelector('#ability-menu');
-const abilityButton = document.querySelector('[data-abilities]');
+const abilityOptions = document.querySelector('#ability-options');
+const abilityTitle = abilityOptions.querySelector('#ability-title');
+const optionList = abilityOptions.querySelector('.ability-options-list');
 const portraitMap = document.querySelector('#portrait-map');
 const portraitTempo = document.querySelector('#portrait-tempo');
 const aimCancel = document.querySelector('#cancel-aim');
-const arenaWrap = canvas.parentElement;
+const arenaWrap = canvas.closest('.arena-wrap');
 const strainMeter = document.querySelector('#strain-meter');
 const waveTimer = document.querySelector('#incursion-next');
 const waveLabel = document.querySelector('#portrait-wave');
@@ -129,7 +130,7 @@ start.addEventListener('click', () => {
 });
 restart.addEventListener('click', () => {
   restart.closest('dialog').close();
-  abilityMenu.close();
+  abilityOptions.close();
   resetMatch(true);
   start.focus({ preventScroll: true });
 });
@@ -172,7 +173,8 @@ function finishAim(cast) {
     showStatus(snapshot.message);
   } else showStatus('');
   render(match.snapshot());
-  abilityButton.focus({ preventScroll: true });
+  const trigger = actionDock.querySelector(`[data-aim-ultimate="${id}"]`);
+  (trigger?.disabled ? start : trigger)?.focus({ preventScroll: true });
 }
 
 aimCancel.addEventListener('click', () => finishAim(false));
@@ -380,21 +382,32 @@ function drawFogOverlay(reconLevel, opponent) {
 const priorities = { default: 'Automatic', veteran: 'Most laps', lowest: 'Lowest health', highest: 'Highest health', manual: 'Manual' };
 const contracts = { chimera: ['Chimera', 90], abomination: ['Abomination', 180], hp: ['+20% health', 55], armor: ['+2 armor', 55], speed: ['+15% speed', 55] };
 let abilityLayout = '';
-let abilityPage = 0;
-let abilityPages = [];
-const abilityPrevious = abilityMenu.querySelector('[data-ability-prev]');
-const abilityNext = abilityMenu.querySelector('[data-ability-next]');
-const abilityPosition = abilityMenu.querySelector('[data-ability-position]');
 
-function showAbilityPage(page) {
-  abilityPage = page;
-  abilityPages.forEach((panel, index) => { panel.hidden = index !== page; });
-  abilityPrevious.parentElement.hidden = abilityPages.length < 2;
-  if (abilityPages.length) updatePager(abilityPrevious, abilityNext, abilityPosition, page, abilityPages.length);
+function refreshAbilityOptions(player, active) {
+  for (const button of optionList.querySelectorAll('[data-priority]')) {
+    button.disabled = !active;
+    button.setAttribute('aria-pressed', String(player.priorityMode === button.dataset.priority));
+  }
+  for (const button of optionList.querySelectorAll('[data-bioforge]')) {
+    button.disabled = !active || player.energy < contracts[button.dataset.bioforge][1];
+  }
 }
 
-abilityPrevious.addEventListener('click', () => showAbilityPage(abilityPage - 1));
-abilityNext.addEventListener('click', () => showAbilityPage(abilityPage + 1));
+function openAbilityOptions(trigger) {
+  if (aim) finishAim(false);
+  const kind = trigger.dataset.abilityOptions;
+  setText(abilityTitle, trigger.textContent);
+  optionList.innerHTML = kind === 'priority'
+    ? Object.entries(priorities).map(([id, label]) =>
+      `<button type="button" data-priority="${id}">${label}</button>`).join('')
+    : Object.entries(contracts).map(([id, [label, cost]]) =>
+      `<button type="button" data-bioforge="${id}">${label} · ${cost} Flux</button>`).join('');
+  refreshAbilityOptions(latestSnapshot.players.human, true);
+  trigger.focus({ preventScroll: true });
+  abilityOptions.showModal();
+}
+
+abilityOptions.querySelector('[data-close-ability-options]').addEventListener('click', () => abilityOptions.close());
 
 function renderActionDock(snapshot) {
   const player = snapshot.players.human;
@@ -402,8 +415,8 @@ function renderActionDock(snapshot) {
   const owned = new Set(Object.values(player.tier3).flatMap(choices => Object.keys(choices).filter(id => choices[id])));
   const quick = [];
 
-  function ability(attribute, id, name, remaining, ready = 'Ready', side = '') {
-    quick.push({ attribute, id, name, remaining, ready, side });
+  function ability(attribute, id, name, remaining, side = '') {
+    quick.push({ attribute, id, name, remaining, side });
   }
 
   if (player.tower.overdrive) ability('action', 'overdrive', 'Surge Core', player.overdriveCooldown);
@@ -414,10 +427,10 @@ function renderActionDock(snapshot) {
     if (!owned.has(id)) continue;
     const label = ultimateLabels[id];
     const remaining = player.ultimateCooldowns[id];
-    if (id === 'nullifyingPurge' || id === 'orbitalBreach') ability('aim-ultimate', id, label, remaining, 'Aim on track');
+    if (id === 'nullifyingPurge' || id === 'orbitalBreach') ability('aim-ultimate', id, label, remaining);
     else if (id === 'conjunctionSpheres') {
-      ability('ultimate', id, 'Conjunction · Entry side', remaining, 'Ready', 'left');
-      ability('ultimate', id, 'Conjunction · Return side', remaining, 'Ready', 'right');
+      ability('ultimate', id, 'Conjunction · Entry', remaining, 'left');
+      ability('ultimate', id, 'Conjunction · Return', remaining, 'right');
     } else ability('ultimate', id, label, remaining);
   }
 
@@ -426,19 +439,15 @@ function renderActionDock(snapshot) {
   const layout = JSON.stringify([quick.map(item => item.id), targeting, bioforge]);
   if (layout !== abilityLayout) {
     abilityLayout = layout;
-    const pages = [];
-    addPages(pages, 'Combat', quick.map(item =>
-      `<button type="button" data-${item.attribute}="${item.id}"${item.side ? ` data-side="${item.side}"` : ''}><span>${item.name}</span><small></small></button>`));
-    if (targeting) addPages(pages, 'Target priority', Object.entries(priorities).map(([id, label]) =>
-      `<button type="button" data-priority="${id}">${label}</button>`));
-    if (bioforge) addPages(pages, 'Bioforge', Object.entries(contracts).map(([id, [label, cost]]) =>
-      `<button type="button" data-bioforge="${id}">${label} · ${cost} Flux</button>`));
-    actionDock.innerHTML = pages.map(({ title, items }) =>
-      `<section class="ability-page"><h3>${title}</h3><div>${items.join('')}</div></section>`).join('');
-    abilityPages = [...actionDock.children];
-    abilityButton.disabled = !pages.length;
-    if (abilityButton.disabled) abilityMenu.close();
-    showAbilityPage(0);
+    const buttons = quick.map(item =>
+      `<button type="button" data-${item.attribute}="${item.id}"${item.side ? ` data-side="${item.side}"` : ''}><span>${item.name}</span><small></small></button>`);
+    if (targeting) buttons.push('<button type="button" data-ability-options="priority" aria-haspopup="dialog">Command Override</button>');
+    if (bioforge) buttons.push('<button type="button" data-ability-options="bioforge" aria-haspopup="dialog">Bioforge Program</button>');
+    actionDock.innerHTML = buttons.join('');
+    actionDock.hidden = !buttons.length;
+    const columns = buttons.length > 4 ? 3 : Math.max(1, buttons.length);
+    actionDock.style.setProperty('--dock-columns', String(columns));
+    if (actionDock.hidden && abilityOptions.open) abilityOptions.close();
   }
   actionDock.querySelectorAll('button[data-action], button[data-active], button[data-ultimate], button[data-aim-ultimate]').forEach((button, index) => {
     const item = quick[index];
@@ -446,21 +455,20 @@ function renderActionDock(snapshot) {
     button.disabled = !active || !ready;
     button.classList.toggle('ability-ready', active && ready);
     if (item.attribute === 'aim-ultimate') button.setAttribute('aria-pressed', String(aim === item.id));
-    const label = !ready ? `Recharging · ${Math.ceil(item.remaining)} s` : paused ? 'Paused' : aim === item.id ? 'Aiming' : item.ready;
+    const label = !ready ? `${Math.ceil(item.remaining)} s` : aim === item.id ? 'Aiming' : '';
     setText(button.lastElementChild, label);
   });
-  for (const button of actionDock.querySelectorAll('[data-priority]')) {
-    button.disabled = !active;
-    button.setAttribute('aria-pressed', String(player.priorityMode === button.dataset.priority));
-  }
-  for (const button of actionDock.querySelectorAll('[data-bioforge]')) {
-    button.disabled = !active || player.energy < contracts[button.dataset.bioforge][1];
+  for (const button of actionDock.querySelectorAll('[data-ability-options]')) button.disabled = !active;
+  if (abilityOptions.open) {
+    if (!active) abilityOptions.close();
+    else refreshAbilityOptions(player, active);
   }
 }
 
-actionDock.addEventListener('click', event => {
+function useAbility(event) {
   const button = event.target.closest('button');
   if (!button || !running || paused) return;
+  if (button.hasAttribute('data-ability-options')) return openAbilityOptions(button);
   const { action, active, priority, bioforge, aimUltimate, ultimate, side } = button.dataset;
   const before = latestSnapshot.players.human;
   if (aimUltimate && aim === aimUltimate) return finishAim(false);
@@ -476,11 +484,10 @@ actionDock.addEventListener('click', event => {
     trackMarkerVisible = true;
     showStatus('');
     render(match.snapshot());
-    abilityMenu.close();
     canvas.focus({ preventScroll: true });
     return;
   } else if (ultimate) match.activateUltimate(ultimate, .5, side ?? 'left');
-  abilityMenu.close();
+  if (abilityOptions.open) abilityOptions.close();
   const snapshot = match.snapshot();
   const after = snapshot.players.human;
   if ((action && after.overdriveCooldown > before.overdriveCooldown) ||
@@ -491,7 +498,9 @@ actionDock.addEventListener('click', event => {
   if (bioforge && after.energy < before.energy) gameAudio.play('purchase');
   showStatus(priority ? `Target priority · ${priorities[priority]}` : snapshot.message);
   render(snapshot);
-});
+}
+actionDock.addEventListener('click', useAbility);
+optionList.addEventListener('click', useAbility);
 
 function openUpgrades() {
   if (aim) finishAim(false);
@@ -602,8 +611,8 @@ function render(snapshot) {
   latestSnapshot = snapshot;
   snapshotTime = snapshot.time;
   context.clearRect(0, 0, canvas.width, canvas.height);
-  arenaArt.drawBackground();
   const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot' && mode.value === 'versus', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
+  arenaWrap.toggleAttribute('data-fogged', opponentView && !visible);
   drawSide(viewedPlayer, viewedSide, opponentView ? '#c99ce4' : '#e8bb79', visible); if (opponentView && !visible) drawFogOverlay(reconLevel, bot); if (visible) drawCritFloats(snapshot);
   drawAim();
   setText(document.querySelector('#clock'), `${String(Math.floor(snapshot.time / 60)).padStart(2, '0')}:${String(Math.floor(snapshot.time % 60)).padStart(2, '0')}`);
@@ -637,7 +646,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 const fortressAtlas = document.querySelector('#fortress-atlas');
-const arenaArt = createArenaArt(context, canvas, routePoint, fortressAtlas);
+const arenaArt = createArenaArt(context, routePoint, fortressAtlas);
 const turrets = { human:createTurretMotion(), bot:createTurretMotion() };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const upgradePanel = createUpgradePanel({

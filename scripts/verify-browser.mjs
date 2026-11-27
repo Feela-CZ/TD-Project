@@ -97,8 +97,10 @@ async function scenario(base, mobile, offline = false) {
     await page.goto(base);
     if (!offline) assert.equal(new URL(page.url()).pathname, '/web/', 'the advertised root must land in the running game');
     await page.waitForFunction(standalone => {
-      const atlas = document.querySelector('#fortress-atlas');
-      return atlas?.naturalWidth > 0 && (!standalone || atlas.src.startsWith('data:image/webp;'));
+      return ['#fortress-atlas', '.arena-terrain'].every(selector => {
+        const art = document.querySelector(selector);
+        return art?.naturalWidth > 0 && (!standalone || art.src.startsWith('data:image/webp;'));
+      });
     }, offline);
     await start.waitFor();
     assert.equal(await flux(), 150);
@@ -107,6 +109,8 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await page.locator('#portrait-wave').textContent(), 'Wave 1 / 60');
     assert.equal(await page.locator('#strain-meter').getAttribute('max'), '100');
     assert.equal(await page.locator('[data-rival]').isVisible(), false);
+    assert.equal(await page.locator('[data-abilities]').count(), 0, 'combat abilities must not use a generic menu button');
+    assert.equal(await page.locator('#action-dock').isVisible(), false, 'the dock appears when an ability is earned');
     if (mobile) {
       const available = await page.locator('main').evaluate(main => {
         const style = getComputedStyle(main);
@@ -248,13 +252,14 @@ async function scenario(base, mobile, offline = false) {
     const active = page.locator('[data-active="salvo"]');
     assert.equal(await active.isEnabled(), false);
     await press(start);
-    assert.match(await active.textContent(), /Ready/);
+    assert.equal(await active.isVisible(), true, 'the earned ability is already visible on the battlefield');
+    assert.equal(await active.isEnabled(), true);
     if (mobile) await capture(page, 'mobile');
-    await press(page.locator('[data-abilities]'));
+
     const beforeAbilityCue = await tones();
     await press(active);
     assert.equal(await tones(), beforeAbilityCue + 2, 'a fired ability has its own sound');
-    assert.match(await active.textContent(), /Recharging · 4[78] s/);
+    assert.match(await active.locator('small').textContent(), /^4[78] s$/);
     assert.equal(await active.isEnabled(), false);
     await press(page.locator('[data-open-dialog="match-settings"]'));
     const sound = page.locator('#sound-effects');
@@ -365,18 +370,22 @@ async function verifyTurretArt(base) {
   }
 }
 
+async function exposeMatch(page) {
+  await page.route('**/dist/live.mjs', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: `${await response.text()}
+      const readSnapshot = LiveMatch.prototype.snapshot;
+      LiveMatch.prototype.snapshot = function () {
+        window.aimingTestMatch = this;
+        return readSnapshot.call(this);
+      };` });
+  });
+}
+
 async function verifyAiming(base) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   try {
-    await page.route('**/dist/live.mjs', async route => {
-      const response = await route.fetch();
-      await route.fulfill({ response, body: `${await response.text()}
-        const readSnapshot = LiveMatch.prototype.snapshot;
-        LiveMatch.prototype.snapshot = function () {
-          window.aimingTestMatch = this;
-          return readSnapshot.call(this);
-        };` });
-    });
+    await exposeMatch(page);
     await page.goto(base);
     await page.locator('#start').click();
     await page.evaluate(() => {
@@ -409,29 +418,103 @@ async function verifyAiming(base) {
     const aim = page.locator('[data-aim-ultimate="orbitalBreach"]');
     const canvas = page.locator('#arena');
     const cancel = page.locator('#cancel-aim');
-    await page.locator('[data-abilities]').click();
+
     await aim.click();
     await cancel.waitFor();
     assert.equal(await canvas.getAttribute('aria-label'), 'Aim Orbital Breach');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'arena');
     await page.keyboard.press('Escape');
     assert.equal(await cancel.isVisible(), false);
-    assert.match(await aim.textContent(), /Aim on track/);
-    await page.locator('[data-abilities]').click();
+    assert.equal(await aim.isEnabled(), true);
+    assert.equal(await aim.getAttribute('aria-pressed'), 'false');
+
     await aim.click();
     const { width, height } = await canvas.boundingBox();
     await canvas.click({ position: { x: width / 2, y: height / 2 } });
     assert.equal(await cancel.isVisible(), true, 'clicking outside the track must not spend the ability');
     await cancel.click();
-    await page.locator('[data-abilities]').click();
+
     await aim.click();
     await page.keyboard.press('ArrowLeft');
     await page.keyboard.press('Enter');
     assert.equal(await cancel.isVisible(), false);
-    assert.match(await aim.textContent(), /Recharging/);
+    assert.match(await aim.locator('small').textContent(), /^\d+ s$/);
     const progress = await page.evaluate(() => window.aimingTestMatch.players.human.breachScars[0].progress);
     assert.equal(progress, .48, 'the cast must land at the selected track position');
     console.log('PASS: keyboard and Tier III purchases, exact Ultimate link, and targeted ability aim, cancel and cast.');
+  } finally {
+    await page.close();
+  }
+}
+
+async function verifyAbilityChoices(base) {
+  const page = await browser.newPage({ viewport: { width: 320, height: 568 }, hasTouch: true, isMobile: true });
+  try {
+    await exposeMatch(page);
+    await page.goto(base);
+    await page.locator('[data-open-dialog="match-settings"]').tap();
+    await page.locator('#mode').selectOption('versus');
+    await page.locator('#restart').tap();
+
+    for (const [root, path, ultimate] of [
+      ['overdrive', 'phaseShield', 'conjunctionSpheres'],
+      ['rewardFloor', 'expandedField', 'commandOverride'],
+      ['interest', 'battery', 'bioforgeProgram']
+    ]) {
+      if (root !== 'overdrive') {
+        await page.locator('[data-open-dialog="match-settings"]').tap();
+        await page.locator('#restart').tap();
+      }
+      await page.evaluate(([root, path, ultimate]) => {
+        const match = window.aimingTestMatch;
+        match.players.human.energy = 100_000;
+        match.buy('tower', 'overdrive');
+        if (root !== 'overdrive') match.buy('tower', root);
+        match.buyTier2('overdrive', 'salvo');
+        for (let rank = 0; rank < 5; rank++) match.buyTier2(root, path);
+        match.buyTier3(root, ultimate);
+      }, [root, path, ultimate]);
+      const dock = page.locator('#action-dock');
+      const options = page.locator('#ability-options');
+      const choice = root === 'overdrive'
+        ? dock.locator('[data-ultimate="conjunctionSpheres"][data-side="right"]')
+        : dock.locator(`[data-ability-options="${root === 'interest' ? 'bioforge' : 'priority'}"]`);
+      await choice.waitFor();
+      assert.equal(await dock.locator('button').count(), root === 'overdrive' ? 5 : 3);
+      await dock.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        const canvas = document.querySelector('#arena').getBoundingClientRect();
+        if (bounds.top < canvas.bottom || bounds.bottom > innerHeight || document.scrollingElement.scrollHeight > innerHeight) {
+          throw new Error('Combat abilities must fit below the arena without scrolling or covering the track');
+        }
+        for (const button of element.querySelectorAll('button')) {
+          const rect = button.getBoundingClientRect();
+          if (rect.height < 44 || rect.right > innerWidth || rect.bottom > innerHeight) {
+            throw new Error('Combat ability must stay usable as a direct touch target');
+          }
+        }
+      });
+      if (root === 'overdrive') await capture(page, 'phone-active-abilities');
+      await choice.tap();
+
+      if (root === 'overdrive') {
+        assert.equal(await options.isVisible(), false);
+        assert.equal(await choice.isEnabled(), false, 'Conjunction starts its shared cooldown directly from the battlefield');
+        assert.equal(await dock.locator('[data-side="left"]').isEnabled(), false);
+      } else {
+        assert.equal(await options.isVisible(), true);
+        assert.equal(await options.locator('.ability-options-list button').count(), 5);
+        if (root === 'rewardFloor') {
+          await options.locator('[data-priority="manual"]').tap();
+          assert.equal(await page.evaluate(() => window.aimingTestMatch.players.human.priorityMode), 'manual');
+        } else {
+          await options.locator('[data-bioforge="speed"]').tap();
+          assert.equal(await page.evaluate(() => window.aimingTestMatch.players.human.purchaseLog.at(-1).label), 'Bioforge speed');
+        }
+        assert.equal(await options.isVisible(), false);
+      }
+    }
+    console.log('PASS: full combat dock fits a 320 px phone and both contextual ability choices work.');
   } finally {
     await page.close();
   }
@@ -473,6 +556,13 @@ async function verifyFixedViewports(base) {
       await page.goto(base);
       const arena = page.locator('#arena');
       await checkFit('battlefield', ['main', '#arena', '.game-toolbar']);
+      await page.waitForFunction(() => document.querySelector('.arena-terrain').naturalWidth > 0);
+      assert.ok(await page.locator('.arena-terrain').evaluate(image => {
+        const { width, height } = image.getBoundingClientRect();
+        const arena = image.parentElement;
+        return getComputedStyle(image).objectFit === 'cover' &&
+          Math.abs(width - arena.clientWidth) < 1 && Math.abs(height - arena.clientHeight) < 1;
+      }), 'alien terrain must fill the entire arena');
       const field = await arena.boundingBox();
       await page.mouse.move(field.x + field.width / 2, field.y + field.height / 2);
       await page.mouse.wheel(500, 500);
@@ -528,12 +618,14 @@ try {
   assert.equal((await fetch(`${base}/web`, { redirect:'manual' })).headers.get('location'), '/web/');
   assert.equal((await fetch(`${base}/scripts/`)).status, 404, 'directories other than the game index are not streamed');
   assert.equal((await fetch(`${base}/web/art/fortress-atlas.webp`, { method: 'HEAD' })).headers.get('content-type'), 'image/webp');
+  assert.equal((await fetch(`${base}/web/art/kethra-terrain.webp`, { method: 'HEAD' })).headers.get('content-type'), 'image/webp');
   browser = await chromium.launch({ executablePath: process.env.KETHRA_BROWSER || undefined });
   await verifyFixedViewports(base);
   await scenario(base, false);
   await scenario(base, true);
   await verifyTurretArt(base);
   await verifyAiming(base);
+  await verifyAbilityChoices(base);
   if (process.env.KETHRA_PREVIEW_FILE) await scenario(pathToFileURL(resolve(process.env.KETHRA_PREVIEW_FILE)).href, false, true);
 } finally {
   await browser?.close();

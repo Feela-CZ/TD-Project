@@ -104,16 +104,6 @@ canvas { display: block; width: 100%; height: auto; touch-action: pan-y; }
 }
 .status,.field-actions > button { margin-top: 7px; }
 .status { padding: 8px 10px; border-left: 3px solid var(--active); background: var(--surface); color: #e4f4e9; font-size: .84rem; }
-.action-dock { padding-top: 8px; }
-.action-dock > h2 { margin-bottom: 5px; font-size: .88rem; }
-.quick-abilities,.action-group > div { display: flex; flex-wrap: wrap; gap: 5px; }
-.quick-abilities button,.action-group button { flex: 1 1 auto; font-size: .82rem; }
-.quick-abilities button small { display: block; margin-top: 2px; font-size: .72rem; }
-.quick-abilities .ability-ready { border-color: #77bda3; background: #21443e; color: #daffed; }
-.quick-abilities .ability-ready:hover:not(:disabled) { background: #346453; }
-.action-group { margin-top: 7px; }
-.action-group > h3 { color: var(--muted); margin-bottom: 5px; font-size: .8rem; }
-.action-group button[aria-pressed="true"],.quick-abilities button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .upgrade-panel { padding: 14px; }
 .upgrade-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .upgrade-heading h2 { font-size: 1.24rem; }
