@@ -6,9 +6,6 @@ import { createTurretMotion, FORTRESS } from './turret-motion.mjs';
 
 const canvas = document.querySelector('#arena');
 const context = canvas.getContext('2d');
-const WORLD_WIDTH = canvas.width;
-const WORLD_HEIGHT = canvas.height;
-let horizontalArena = false;
 const status = document.querySelector('#status');
 const start = document.querySelector('#start');
 const restart = document.querySelector('#restart');
@@ -133,9 +130,7 @@ portraitMap.addEventListener('click', () => setMapView(mapView === 'human' ? 'bo
 
 function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
-  const x = (event.clientX - rect.left) * canvas.width / rect.width;
-  const y = (event.clientY - rect.top) * canvas.height / rect.height;
-  return horizontalArena ? { x: WORLD_WIDTH - y, y: x } : { x, y };
+  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
 }
 
 function aimAt(point) {
@@ -223,28 +218,14 @@ canvas.addEventListener('pointerup', event => {
 });
 canvas.addEventListener('pointercancel', () => { swipeStart = null; });
 
-function projectPoint(x, y) {
-  return horizontalArena ? { x: y, y: WORLD_WIDTH - x } : { x, y };
-}
-
-function drawLabel(text, x, y, offsetY) {
-  const point = projectPoint(x, y);
-  context.save();
-  context.resetTransform();
-  context.fillText(text, point.x, point.y + offsetY);
-  context.restore();
-}
-
 function drawEnemyHealth(point, radius, hp) {
-  const anchor = projectPoint(point.x, point.y);
   const width = (radius + 1) * 2;
-  context.save();
-  context.resetTransform();
+  const x = point.x - radius - 1;
+  const y = point.y - radius - 9;
   context.fillStyle = '#081120';
-  context.fillRect(anchor.x - radius - 1, anchor.y - radius - 9, width, 3);
+  context.fillRect(x, y, width, 3);
   context.fillStyle = hp > .35 ? '#77e6a0' : '#ff8a6d';
-  context.fillRect(anchor.x - radius - 1, anchor.y - radius - 9, width * hp, 3);
-  context.restore();
+  context.fillRect(x, y, width * hp, 3);
 }
 
 function routePoint(progress) {
@@ -369,16 +350,16 @@ function drawCritFloats(snapshot) {
     if (float.player !== mapView) continue;
     const age = snapshot.time - float.startedAt; const alpha = Math.max(0, 1 - age / .65);
     const side = float.player === 'human' ? 'human' : 'bot'; const point = formationPoint(float.progress, side, float.targetId);
-    context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; drawLabel('Crit!', point.x, point.y, -24 - age * 28); context.globalAlpha = 1;
+    context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; context.fillText('Crit!', point.x, point.y - 24 - age * 28); context.globalAlpha = 1;
   }
 }
 function drawFogOverlay(reconLevel, opponent) {
-  const fog = context.createRadialGradient(210, 355, 30, 210, 355, 330); fog.addColorStop(0, '#0a1020b8'); fog.addColorStop(1, '#03060eea'); context.fillStyle = fog; context.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-  context.fillStyle = '#d5def3'; context.font = '800 20px system-ui'; context.textAlign = 'center'; drawLabel('FOG OF WAR', 210, 350, -12);
+  const fog = context.createRadialGradient(210, 355, 30, 210, 355, 330); fog.addColorStop(0, '#0a1020b8'); fog.addColorStop(1, '#03060eea'); context.fillStyle = fog; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#d5def3'; context.font = '800 20px system-ui'; context.textAlign = 'center'; context.fillText('FOG OF WAR', 210, 338);
   context.fillStyle = '#97a8cc'; context.font = '600 11px system-ui';
   const message = reconLevel >= 4 ? 'Live composition and cooldown telemetry available.' : reconLevel >= 3 ? 'Tier II telemetry available.' : reconLevel >= 2 ? 'Tier I telemetry available.' : reconLevel > 0 ? `Core Strain ${opponent.load} / ${opponent.overloadCap}` : 'Opponent Kethra, upgrades and economy are concealed.';
-  drawLabel(reconLevel ? `Spectral Relay: ${message}` : message, 210, 350, 12);
-  drawLabel(reconLevel ? `Upgrade to rank ${TIER2_MAX_LEVEL} for full reconnaissance.` : 'Spectral Relay rank 1 reveals purchases and Core Strain.', 210, 350, 32);
+  context.fillText(reconLevel ? `Spectral Relay: ${message}` : message, 210, 362);
+  context.fillText(reconLevel ? `Upgrade to rank ${TIER2_MAX_LEVEL} for full reconnaissance.` : 'Spectral Relay rank 1 reveals purchases and Core Strain.', 210, 382);
 }
 const priorities = { default: 'Automatic', veteran: 'Most laps', lowest: 'Lowest health', highest: 'Highest health', manual: 'Pick an enemy' };
 const contracts = { chimera: ['Chimera', 90], abomination: ['Abomination', 180], hp: ['+20% health', 55], armor: ['+2 armor', 55], speed: ['+15% speed', 55] };
@@ -597,10 +578,7 @@ let latestSnapshot = null;
 function render(snapshot) {
   latestSnapshot = snapshot;
   snapshotTime = snapshot.time;
-  context.resetTransform();
   context.clearRect(0, 0, canvas.width, canvas.height);
-  // Rotate the same world for wide arenas. Simulation and aiming keep their original coordinates.
-  if (horizontalArena) context.setTransform(0, -1, 1, 0, 0, WORLD_WIDTH);
   arenaArt.drawBackground();
   const human = snapshot.players.human, bot = snapshot.players.bot, reconLevel = human.tier2.rewardFloor.recon, opponentView = mapView === 'bot' && mode.value === 'versus', viewedPlayer = opponentView ? bot : human, viewedSide = opponentView ? 'bot' : 'human', visible = !opponentView || reconLevel >= TIER2_MAX_LEVEL;
   drawSide(viewedPlayer, viewedSide, opponentView ? '#c99ce4' : '#e8bb79', visible); if (opponentView && !visible) drawFogOverlay(reconLevel, bot); if (visible) drawCritFloats(snapshot);
@@ -634,7 +612,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 const fortressAtlas = document.querySelector('#fortress-atlas');
-const arenaArt = createArenaArt(context, canvas, routePoint, fortressAtlas, drawLabel);
+const arenaArt = createArenaArt(context, canvas, routePoint, fortressAtlas);
 const turrets = { human:createTurretMotion(), bot:createTurretMotion() };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const upgradePanel = createUpgradePanel({
@@ -654,15 +632,4 @@ const touchUi = createTouchUi({ openUpgrades, closeUpgrades: upgradePanel.close 
 fortressAtlas.addEventListener('load', () => {
   if (!running || paused) render(match.snapshot());
 });
-new ResizeObserver(([entry]) => {
-  const { width, height } = entry.contentRect;
-  const nextHorizontal = width > height * 1.05;
-  if (nextHorizontal === horizontalArena) return;
-  horizontalArena = nextHorizontal;
-  canvas.width = horizontalArena ? WORLD_HEIGHT : WORLD_WIDTH;
-  canvas.height = horizontalArena ? WORLD_WIDTH : WORLD_HEIGHT;
-  canvas.toggleAttribute('data-horizontal', horizontalArena);
-  render(latestSnapshot);
-}).observe(arenaWrap);
-
 setModeUi(); render(match.snapshot()); requestAnimationFrame(frame);

@@ -396,13 +396,13 @@ async function verifyFixedViewports(base) {
   const cases = [
     { width: 320, height: 568, touch: true },
     { width: 390, height: 667, touch: true },
-    { width: 667, height: 375, touch: true, landscape: true },
-    { width: 740, height: 300, touch: true, landscape: true },
-    { width: 844, height: 390, touch: true, landscape: true },
+    { width: 667, height: 375, touch: true },
+    { width: 740, height: 300, touch: true },
+    { width: 844, height: 390, touch: true },
     { width: 1024, height: 600 },
     { width: 1440, height: 900 },
   ];
-  for (const { width, height, touch, landscape } of cases) {
+  for (const { width, height, touch } of cases) {
     const page = await browser.newPage({ viewport: { width, height }, hasTouch: touch, isMobile: touch });
     const checkFit = async (label, selectors) => {
       const failures = await page.evaluate(selectors => {
@@ -427,17 +427,16 @@ async function verifyFixedViewports(base) {
     try {
       await page.goto(base);
       const arena = page.locator('#arena');
-      if (landscape) await page.locator('#arena[data-horizontal]').waitFor();
       await checkFit('battlefield', ['main', '#arena', '.game-toolbar']);
       const field = await arena.boundingBox();
       await page.mouse.move(field.x + field.width / 2, field.y + field.height / 2);
       await page.mouse.wheel(500, 500);
       await checkFit('after wheel', ['main', '#arena']);
-      if (landscape) {
-        const world = await arena.evaluate(element => ({ width: element.width, height: element.height }));
-        await arena.click({ position: { x: field.width * FORTRESS.y / world.width, y: field.height * (world.height - FORTRESS.x) / world.height } });
-        await page.locator('#upgrade-sheet[open]').waitFor();
-      } else await page.locator('[data-open]').click();
+      const world = await arena.evaluate(element => ({ width: element.width, height: element.height }));
+      assert.equal(world.width / world.height, .6, 'the game world must stay in portrait orientation');
+      assert.ok(Math.abs(field.width / field.height - .6) < .02, 'displayed arena must keep the portrait proportions');
+      await arena.click({ position: { x: field.width * FORTRESS.x / world.width, y: field.height * FORTRESS.y / world.height } });
+      if (width < 1120 || height < 660) await page.locator('#upgrade-sheet[open]').waitFor();
       await checkFit('upgrades', ['#upgrade-panel', '.upgrade-tree', '.upgrade-detail']);
       for (const branch of [1, 2, 0]) {
         await page.locator(`[data-group="${branch}"]`).click();
