@@ -383,6 +383,46 @@ async function exposeMatch(page) {
   });
 }
 
+async function verifyCritLabels(base) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 667 }, hasTouch: true, isMobile: true });
+  try {
+    await exposeMatch(page);
+    await page.addInitScript(() => {
+      window.critLabels = new Set();
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (label, ...args) {
+        if (this.canvas.id === 'arena' && label.startsWith('Crit!')) window.critLabels.add(label);
+        return fillText.call(this, label, ...args);
+      };
+    });
+    await page.goto(base);
+    await page.locator('#start').tap();
+    await page.waitForFunction(() => window.aimingTestMatch.players.human.creeps.length);
+    await page.evaluate(() => {
+      const match = window.aimingTestMatch;
+      const human = match.players.human;
+      Object.assign(human.creeps[0], { progress: .5, hp: 10000, maxHp: 10000, baseSpeed: 0 });
+      human.tower.crit = 1;
+      human.tier2.crit.critMultiplier = 5;
+      match.random.next = () => 0;
+    });
+    await page.waitForFunction(() => window.critLabels.has('Crit!'));
+    assert.deepEqual(await page.evaluate(() => [...window.critLabels]), ['Crit!']);
+    await page.evaluate(() => {
+      const match = window.aimingTestMatch;
+      const human = match.players.human;
+      human.tier3.crit.entropyVector = 1;
+      human.nextReadyAt = match.time;
+      const rolls = [0, .95, 0];
+      match.random.next = () => rolls.shift() ?? 0;
+    });
+    await page.waitForFunction(() => window.critLabels.has('Crit! ×7'));
+    console.log('PASS: the mobile canvas shows a plain fixed crit and the actual 7× Entropy Vector roll.');
+  } finally {
+    await page.close();
+  }
+}
+
 async function verifyAiming(base) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   try {
@@ -646,6 +686,7 @@ try {
   await scenario(base, true);
   await verifyTurretArt(base);
   await verifyAiming(base);
+  await verifyCritLabels(base);
   await verifyAbilityChoices(base);
   if (process.env.KETHRA_PREVIEW_FILE) await scenario(pathToFileURL(resolve(process.env.KETHRA_PREVIEW_FILE)).href, false, true);
 } finally {

@@ -310,7 +310,29 @@ const critical = new LiveMatch(11);
 critical.players.human.tower.crit = 1;
 critical.random.next = () => 0;
 advance(critical, 21.4);
-assert.ok(critical.snapshot().critFloats.length > 0, 'a critical impact must create a short-lived combat float');
+assert.ok(critical.snapshot().critFloats.some(float => float.rolledCritMultiplier === null), 'fixed crits use an unnumbered combat float');
+
+for (const [roll, expected] of [[.1, 3], [.6, 4], [.8, 5], [.9, 6], [.95, 7], [.972, 8], [.985, 9], [.997, 10]]) {
+  const match = new LiveMatch(12, { botEnabled: false });
+  advance(match, .05);
+  match.waveSpawns.human[1] = RULES.creepsPerWave;
+  match.waveSpawns.bot[1] = RULES.creepsPerWave;
+  const player = match.players.human;
+  const target = player.creeps[0];
+  Object.assign(target, { progress: .5, hp: 10000, maxHp: 10000, baseSpeed: 0 });
+  player.tower.crit = 1;
+  player.tier2.crit.critMultiplier = TIER2_MAX_LEVEL;
+  player.tier3.crit.entropyVector = 1;
+  const [baseDamage] = match.snapshot().players.human.combat.damage;
+  const rolls = [0, roll, 0];
+  match.random.next = () => rolls.shift() ?? 0;
+  match.step(.05);
+  assert.equal(player.projectiles[0].damage, baseDamage * expected, 'every Entropy Vector outcome must affect real damage');
+  assert.equal(player.projectiles[0].rolledCritMultiplier, expected);
+  advance(match, .3);
+  assert.equal(target.hp, 10000 - baseDamage * expected);
+  assert.equal(match.snapshot().critFloats[0].rolledCritMultiplier, expected, 'the float must retain the roll made when the projectile fired');
+}
 
 const projectile = new LiveMatch(9);
 advance(projectile, 21.1);

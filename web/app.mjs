@@ -367,7 +367,8 @@ function drawCritFloats(snapshot) {
     if (float.player !== mapView) continue;
     const age = snapshot.time - float.startedAt; const alpha = Math.max(0, 1 - age / .65);
     const side = float.player === 'human' ? 'human' : 'bot'; const point = formationPoint(float.progress, side, float.targetId);
-    context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; context.fillText('Crit!', point.x, point.y - 24 - age * 28); context.globalAlpha = 1;
+    const label = float.rolledCritMultiplier ? `Crit! ×${float.rolledCritMultiplier}` : 'Crit!';
+    context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; context.fillText(label, point.x, point.y - 24 - age * 28); context.globalAlpha = 1;
   }
 }
 function drawFogOverlay(reconLevel, opponent) {
