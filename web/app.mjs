@@ -2,6 +2,7 @@ import { BOT_PROFILES, LiveMatch, TIER2_MAX_LEVEL, TIER2_FAMILIES, TIER3_FAMILIE
 import { createTouchUi } from './touch-ui.mjs';
 import { createUpgradePanel } from './upgrade-panel.mjs';
 import { createArenaArt } from './arena-art.mjs';
+import { FIRING_CENTER, routeBearing, routePoint } from './arena-route.mjs';
 import { createTurretMotion, FORTRESS } from './turret-motion.mjs';
 
 const canvas = document.querySelector('#arena');
@@ -29,7 +30,11 @@ const waveLabel = document.querySelector('#portrait-wave');
 const nextWaveLabel = document.querySelector('#next-wave-label');
 const fluxLabel = document.querySelector('#portrait-flux');
 const strainLabel = document.querySelector('#overload');
-const createMatch = () => new LiveMatch(undefined, mode.value === 'solo' ? { botEnabled: false, soloProgression: true } : { botProfile:botProfile.value });
+const createMatch = () => new LiveMatch(undefined, {
+  firingCenter: FIRING_CENTER,
+  closedTrack: true,
+  ...(mode.value === 'solo' ? { botEnabled: false, soloProgression: true } : { botProfile: botProfile.value })
+});
 let match = createMatch();
 let running = false;
 let paused = false;
@@ -37,7 +42,7 @@ let previous = 0;
 let mapView = 'human';
 let swipeStart = null;
 let aim = null;
-let trackPosition = .5;
+let trackPosition = FIRING_CENTER;
 let trackMarkerVisible = false;
 let statusExpiry;
 const ultimateLabels = Object.fromEntries(Object.values(TIER3_FAMILIES).flat().map(({ id, label }) => [id, label]));
@@ -153,7 +158,7 @@ canvas.addEventListener('keydown', event => {
     if (trackMarkerVisible) finishAim(true);
   } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault();
-    trackPosition = Math.max(0, Math.min(1, trackPosition + (event.key === 'ArrowLeft' ? -.02 : .02)));
+    trackPosition = (trackPosition + (event.key === 'ArrowLeft' ? -.02 : .02) + 1) % 1;
     trackMarkerVisible = true;
     render(latestSnapshot);
   }
@@ -184,7 +189,7 @@ canvas.addEventListener('pointerup', event => {
   const player = latestSnapshot.players.human;
   if (running && !paused && player.priorityMode === 'manual') {
     const nearest = player.creeps.map(creep => {
-      const position = formationPoint(creep.progress, 'human', creep.id);
+      const position = formationPoint(creep.progress, creep.id);
       return { creep, distance: Math.hypot(position.x - point.x, position.y - point.y) };
     }).sort((a, b) => a.distance - b.distance)[0];
     if (nearest && nearest.distance < 24) {
@@ -198,21 +203,13 @@ canvas.addEventListener('pointerup', event => {
 });
 canvas.addEventListener('pointercancel', () => { swipeStart = null; });
 
-function routePoint(progress) {
-  if (progress <= .3) return { x:68, y:626 - progress / .3 * 408 };
-  if (progress <= .7) { const angle = Math.PI * (1 - (progress - .3) / .4); return { x:210 + 142 * Math.cos(angle), y:218 - 112 * Math.sin(angle) }; }
-  return { x:352, y:218 + (progress - .7) / .3 * 408 };
-}
-function formationPoint(progress, side, creepId) {
-  const point = routePoint(progress, side);
-  const before = routePoint(Math.max(0, progress - .001), side);
-  const after = routePoint(Math.min(1, progress + .001), side);
-  const dx = after.x - before.x; const dy = after.y - before.y;
-  const length = Math.hypot(dx, dy) || 1;
+function formationPoint(progress, creepId) {
+  const point = routePoint(progress);
+  const bearing = routeBearing(progress);
   const offset = visualLaneForCreep(creepId) * 5;
   // Visual-only: the perpendicular offset never changes the creep's progress
   // or any calculation in the deterministic match.
-  return { x: point.x - dy / length * offset, y: point.y + dx / length * offset };
+  return { x: point.x - Math.sin(bearing) * offset, y: point.y + Math.cos(bearing) * offset };
 }
 function creepReward(creep, player) { return killFluxForCreep(creep.wave, creep.completedLaps, player.tower.rewardFloor); }
 function creepColor(creep, player) {
@@ -265,11 +262,11 @@ function drawKethra(creep, point, radius, baseColor) {
   context.restore();
 }
 function drawSide(player, side, color, visible) {
-  arenaArt.drawTrack(snapshotTime, color, visible ? player.killzoneCoverage : .3);
-  if (player.conjunctionUntil > snapshotTime && player.conjunctionZone) { context.strokeStyle = '#d9bcff88'; context.lineWidth = 28; context.lineCap = 'round'; context.beginPath(); for (let p = player.conjunctionZone.start; p <= player.conjunctionZone.end + .001; p += .01) { const point = routePoint(Math.min(player.conjunctionZone.end,p), side); p > player.conjunctionZone.start ? context.lineTo(point.x,point.y) : context.moveTo(point.x,point.y); } context.stroke(); }
-  for (const scar of player.breachScars.filter((scar) => !scar.remote && scar.end > snapshotTime)) { const point=routePoint(scar.progress,side), alpha=Math.min(1,(scar.end-snapshotTime)/.5); context.globalAlpha=alpha*.65; context.fillStyle='#ff7b57'; context.beginPath(); context.arc(point.x,point.y,23+Math.sin(snapshotTime*8)*3,0,Math.PI*2); context.fill(); context.globalAlpha=1; }
-  for (const meteor of player.pendingMeteors) { const point=routePoint(meteor.progress,side); context.strokeStyle='#ffbd71'; context.setLineDash([3,4]); context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,18,0,Math.PI*2); context.stroke(); context.setLineDash([]); }
-  const points = new Map(visible ? player.creeps.map(creep => [creep.id, formationPoint(creep.progress, side, creep.id)]) : []);
+  const extension = visible && player.conjunctionUntil > snapshotTime ? player.conjunctionZone : null;
+  arenaArt.drawTrack(snapshotTime, color, visible ? player.killzoneCoverage : .3, extension);
+  for (const scar of player.breachScars.filter((scar) => !scar.remote && scar.end > snapshotTime)) { const point=routePoint(scar.progress), alpha=Math.min(1,(scar.end-snapshotTime)/.5); context.globalAlpha=alpha*.65; context.fillStyle='#ff7b57'; context.beginPath(); context.arc(point.x,point.y,23+Math.sin(snapshotTime*8)*3,0,Math.PI*2); context.fill(); context.globalAlpha=1; }
+  for (const meteor of player.pendingMeteors) { const point=routePoint(meteor.progress); context.strokeStyle='#ffbd71'; context.setLineDash([3,4]); context.lineWidth=2; context.beginPath(); context.arc(point.x,point.y,18,0,Math.PI*2); context.stroke(); context.setLineDash([]); }
+  const points = new Map(visible ? player.creeps.map(creep => [creep.id, formationPoint(creep.progress, creep.id)]) : []);
   const motion = turrets[side];
   const pose = motion.update(snapshotTime, visible ? player.activeTargetId : null, visible ? player.projectiles : [], id => points.get(id), reduceMotion.matches);
   arenaArt.drawTower(color, side === 'human' ? 'YOUR FORTRESS' : 'RIVAL FORTRESS', pose);
@@ -313,7 +310,7 @@ function drawCritFloats(snapshot) {
   for (const float of snapshot.critFloats) {
     if (float.player !== mapView) continue;
     const age = snapshot.time - float.startedAt; const alpha = Math.max(0, 1 - age / .65);
-    const side = float.player === 'human' ? 'human' : 'bot'; const point = formationPoint(float.progress, side, float.targetId);
+    const point = formationPoint(float.progress, float.targetId);
     context.globalAlpha = alpha; context.fillStyle = '#ff86e9'; context.font = '800 18px system-ui'; context.textAlign = 'center'; context.fillText('Crit!', point.x, point.y - 24 - age * 28); context.globalAlpha = 1;
   }
 }
@@ -396,13 +393,13 @@ actionDock.addEventListener('click', event => {
   else if (aimUltimate) {
     mapView = 'human';
     aim = aimUltimate;
-    trackPosition = .5;
+    trackPosition = FIRING_CENTER;
     trackMarkerVisible = true;
     showStatus('');
     render(match.snapshot());
     canvas.focus();
     return;
-  } else if (ultimate) match.activateUltimate(ultimate, .5, side ?? 'left');
+  } else if (ultimate) match.activateUltimate(ultimate, FIRING_CENTER, side ?? 'left');
   const snapshot = match.snapshot();
   showStatus(priority ? `Target priority · ${priorities[priority]}` : snapshot.message);
   render(snapshot);
@@ -428,10 +425,10 @@ function renderFieldControls(snapshot, opponentView) {
   strainMeter.classList.toggle('danger', human.load / human.overloadCap >= .75);
   arenaWrap.classList.toggle('aiming', Boolean(aim));
   aimCancel.hidden = !aim;
-  if (aim) setText(fieldTip, `${ultimateLabels[aim]}: pick a spot on the track. Arrow keys to aim, Enter to fire.`);
+  if (aim) setText(fieldTip, `${ultimateLabels[aim]}: tap the track to aim.`);
   else if (paused) setText(fieldTip, 'Paused. You can still buy upgrades.');
   else if (opponentView) setText(fieldTip, 'Opponent battlefield.');
-  else if (!running) setText(fieldTip, 'Your cannon fires on its own. Spend Flux to upgrade it.');
+  else if (!running || snapshot.time < 8) setText(fieldTip, 'Your cannon fires on the gold track.');
   else if (human.priorityMode === 'manual') setText(fieldTip, 'Manual aim: select an enemy on the track.');
   else setText(fieldTip, '');
   fieldTip.parentElement.hidden = !fieldTip.textContent;
@@ -496,7 +493,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 const fortressAtlas = document.querySelector('#fortress-atlas');
-const arenaArt = createArenaArt(context, canvas, routePoint, fortressAtlas);
+const arenaArt = createArenaArt(context, canvas, fortressAtlas);
 const turrets = { human:createTurretMotion(), bot:createTurretMotion() };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const upgradePanel = createUpgradePanel({

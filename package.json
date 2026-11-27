@@ -16,7 +16,7 @@
     "package:windows": "npm run build && electron-builder --win portable --publish never",
     "package:web": "npm run build && node scripts/package-web.mjs",
     "verify:browser": "npm run build && node scripts/verify-browser.mjs",
-    "verify:all": "npm run build && node dist/verify.mjs && node dist/live.verify.mjs && node scripts/verify-mobile.mjs && node scripts/ultimate-smoke.mjs && node scripts/verify-turret.mjs && node scripts/verify-browser.mjs"
+    "verify:all": "npm run build && node dist/verify.mjs && node dist/live.verify.mjs && node scripts/verify-mobile.mjs && node scripts/ultimate-smoke.mjs && node scripts/verify-turret.mjs && node scripts/verify-arena.mjs && node scripts/verify-browser.mjs"
   },
   "main": "desktop/main.mjs",
   "build": {
