@@ -16,6 +16,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const ultimates = panel.querySelector('[data-ultimates]');
   const ultimateLinks = panel.querySelector('[data-ultimate-links]');
   const specializationLinks = panel.querySelector('[data-specialization-links]');
+  const familyLinks = tree.querySelector('.family-links');
   const familyTile = panel.querySelector('.family-tile');
   const familyName = familyTile.querySelector('[data-family-name]');
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -96,11 +97,12 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     }));
   }
 
-  function buildEdges(container, offers) {
+  function buildEdges(container, offers, lowerColumn) {
     container.replaceChildren(...offers.map((offer, column) => {
       const edge = document.createElement('span');
       edge.className = 'tree-edge';
       edge.dataset.column = column;
+      edge.dataset.bend = lowerColumn > column ? 'right' : lowerColumn < column ? 'left' : 'straight';
       edge.dataset.link = offer.id;
       edges.set(offer.id, edge);
       return edge;
@@ -122,16 +124,15 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     drawnRoot = root;
     for (const offer of [...paths, ...finalUpgrades]) nodes.delete(offer.id);
     edges = new Map();
-    tree.dataset.rootColumn = basics.findIndex(offer => offer.id === root);
+    const rootColumn = basics.findIndex(offer => offer.id === root);
+    tree.dataset.rootColumn = rootColumn;
     paths = TIER2_FAMILIES[root].map(offer => ({ ...offer, tier: 2, max: TIER2_MAX_LEVEL }));
     finalUpgrades = TIER3_FAMILIES[root].map((offer, index) => ({ ...offer, tier: 3, max: 1, choice: paths[index].id }));
     buildNodes(specializations, paths);
     buildNodes(ultimates, finalUpgrades);
     buildEdges(ultimateLinks, finalUpgrades);
-    buildEdges(specializationLinks, paths);
-    const trunk = document.createElement('span');
-    trunk.className = 'tree-trunk';
-    specializationLinks.append(trunk);
+    buildEdges(specializationLinks, paths, rootColumn);
+    buildEdges(familyLinks, basics, 1);
   }
 
   function updateDetail(offer, level, availability) {
@@ -151,10 +152,16 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     running = active;
     buildTree();
     text(balance, `${Math.floor(player().energy)} Flux`);
+    const destination = nodes.get(selected)?.offer;
+    const root = destination ? currentRoot() : null;
+    const specialization = destination?.tier === 3 ? destination.choice : null;
+    familyTile.toggleAttribute('data-path', Boolean(destination));
     for (const [id, { button, status, offer }] of nodes) {
       const level = rank(offer);
       const state = availability(offer, level, true);
       const isSelected = id === selected;
+      const onPath = isSelected || id === root || id === specialization;
+      button.toggleAttribute('data-path', onPath);
       if (button.getAttribute('aria-pressed') !== String(isSelected)) button.setAttribute('aria-pressed', String(isSelected));
       if (isSelected) button.setAttribute('aria-describedby', 'selected-upgrade-description selected-upgrade-cost');
       else button.removeAttribute('aria-describedby');
@@ -167,10 +174,9 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
         : level ? `${level} / ${offer.max}` : state.locked ? 'Locked' : priceLabel(state.price);
       text(status, label);
       edges.get(id)?.toggleAttribute('data-owned', level > 0);
-      edges.get(id)?.toggleAttribute('data-selected', isSelected);
+      edges.get(id)?.toggleAttribute('data-path', onPath);
       if (isSelected) updateDetail(offer, level, state);
     }
-    specializationLinks.toggleAttribute('data-owned', paths.some(offer => rank(offer) > 0));
   }
 
   function clearSelection() {

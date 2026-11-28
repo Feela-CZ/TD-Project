@@ -264,8 +264,8 @@ async function scenario(base, mobile, offline = false) {
     assert.equal(await level('salvo'), '1 / 5');
     assert.match(await feedback(), /Unlocked · 60 Flux/);
     assert.equal(await link('salvo').getAttribute('data-owned'), '');
-    assert.notEqual(await link('salvo').evaluate(edge => getComputedStyle(edge, '::before').boxShadow), 'none');
-    assert.equal(await link('adrenaline').evaluate(edge => getComputedStyle(edge, '::before').boxShadow), 'none');
+    assert.notEqual(await link('salvo').evaluate(edge => getComputedStyle(edge).filter), 'none');
+    assert.equal(await link('adrenaline').evaluate(edge => getComputedStyle(edge).filter), 'none');
     assert.equal(await link('adrenaline').getAttribute('data-owned'), null);
     assert.equal(await link('orbitalBreach').getAttribute('data-owned'), null);
     if (!offline) await capture(page, mobile ? 'mobile-upgrades' : 'desktop-upgrades');
@@ -439,7 +439,7 @@ async function verifyTreeDetailsAndPortals(base) {
           tier.querySelector('.tree-nodes').getBoundingClientRect().top + .5),
         offset: Math.abs(center(tile) - center(root)),
         connected: Math.abs(root.bottom - connector.top) < .5 && Math.abs(tile.top - connector.bottom) < .5 &&
-          links.children.length === 2 && getComputedStyle(links, '::before').width === '2px'
+          links.children.length === 3 && getComputedStyle(links.children[1], '::before').width === '2px'
       };
     });
     assert.deepEqual(alignment.order, ['3', '2', '1']);
@@ -448,8 +448,38 @@ async function verifyTreeDetailsAndPortals(base) {
 
     await page.locator('[data-family-step="-1"]').tap();
     await waitForFamily(page, 'Utility');
+
+    const selectedLinks = () => tree.locator('[data-link][data-path]').evaluateAll(edges =>
+      edges.map(edge => edge.dataset.link).sort());
+    const chooseNode = id => tree.locator(`[data-node="${id}"]`).tap();
+    await chooseNode('overdrive');
+    assert.deepEqual(await selectedLinks(), ['overdrive']);
+    await chooseNode('salvo');
+    assert.deepEqual(await selectedLinks(), ['overdrive', 'salvo']);
+    await chooseNode('orbitalBreach');
+    assert.deepEqual(await selectedLinks(), ['orbitalBreach', 'overdrive', 'salvo']);
+    assert.equal(await tree.locator('[data-node="orbitalBreach"]').getAttribute('data-locked'), '');
+    assert.equal(await page.locator('.family-tile').getAttribute('data-path'), '');
+    assert.equal(await tree.locator('.tree-node[data-path]').count(), 3);
+
+    const strokes = await tree.locator('[data-link][data-path]').evaluateAll(edges => edges.map(edge => {
+      const before = getComputedStyle(edge, '::before');
+      const after = getComputedStyle(edge, '::after');
+      const bent = edge.dataset.bend !== 'straight';
+      return { thickness: parseInt(bent ? before.borderBottomWidth : before.width), glow: getComputedStyle(edge).filter,
+        rounded: !bent || [before.borderBottomLeftRadius, before.borderBottomRightRadius,
+          after.borderTopLeftRadius, after.borderTopRightRadius].filter(value => parseFloat(value) > 0).length === 2 };
+    }));
+    assert.ok(strokes.every(path => path.thickness === 4 && path.glow !== 'none' && path.rounded));
+    assert.equal(await tree.locator('[data-link="adrenaline"]').evaluate(edge => getComputedStyle(edge).filter), 'none');
+
+    await chooseNode('interest');
+    await chooseNode('bioforgeProgram');
+    assert.deepEqual(await selectedLinks(), ['battery', 'bioforgeProgram', 'interest']);
     await page.locator('[data-family-step="1"]').tap();
     await waitForFamily(page, 'Offense');
+    assert.deepEqual(await selectedLinks(), []);
+    assert.equal(await page.locator('.family-tile').getAttribute('data-path'), null);
 
     const animated = await page.locator('[data-family-step="1"]').evaluate(button => {
       button.click();
@@ -612,7 +642,7 @@ async function verifyAiming(base) {
     await orbital.click();
     assert.equal(await orbital.locator('small').textContent(), 'Unlocked');
     assert.equal(await edge.getAttribute('data-owned'), '');
-    assert.notEqual(await edge.evaluate(link => getComputedStyle(link, '::before').boxShadow), 'none');
+    assert.notEqual(await edge.evaluate(link => getComputedStyle(link).filter), 'none');
     assert.equal(await page.locator('[data-link="conjunctionSpheres"]').getAttribute('data-owned'), null);
     await capture(page, 'desktop-ultimate');
 
