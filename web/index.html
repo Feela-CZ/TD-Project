@@ -49,6 +49,15 @@
               <span class="panel-flux" data-panel-flux></span>
               <button type="button" class="upgrade-mobile" data-close-upgrade aria-label="Close upgrades">Close</button>
             </header>
+            <section class="upgrade-detail" id="upgrade-detail" aria-label="Selected upgrade" hidden>
+              <div class="upgrade-detail-title">
+                <h3 data-upgrade-name></h3><span data-upgrade-kind></span>
+                <button type="button" data-open-description aria-haspopup="dialog" aria-controls="upgrade-description">Details</button>
+              </div>
+              <p id="selected-upgrade-description" data-upgrade-effect></p>
+              <p class="upgrade-cost" id="selected-upgrade-cost" data-upgrade-cost></p>
+              <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
+            </section>
             <section class="upgrade-tree" aria-label="Upgrade tree">
               <section class="tree-row" data-tier="3" aria-labelledby="tree-tier-3">
                 <h3 class="tree-tier" id="tree-tier-3"><span>Tier III</span></h3>
@@ -64,20 +73,12 @@
                 <h3 class="tree-tier" id="tree-tier-1"><span>Tier I</span></h3>
                 <div class="tree-nodes" data-families></div>
               </section>
+              <div class="family-links" aria-hidden="true"><span></span><span></span></div>
             </section>
-            <section class="upgrade-detail" id="upgrade-detail" aria-label="Selected upgrade" hidden>
-              <div class="upgrade-detail-title">
-                <h3 data-upgrade-name></h3><span data-upgrade-kind></span>
-                <button type="button" data-open-description aria-haspopup="dialog" aria-controls="upgrade-description">Details</button>
-              </div>
-              <p id="selected-upgrade-description" data-upgrade-effect></p>
-              <p class="upgrade-cost" id="selected-upgrade-cost" data-upgrade-cost></p>
-              <p class="upgrade-feedback" data-upgrade-feedback role="status"></p>
-            </section>
-            <nav class="upgrade-tabs" aria-label="Upgrade branches">
-              <button type="button" data-group="0">Offense</button>
-              <button type="button" data-group="1">Mutation</button>
-              <button type="button" data-group="2">Utility</button>
+            <nav class="family-picker" aria-label="Upgrade branches">
+              <button type="button" class="family-arrow" data-family-step="-1" aria-label="Previous family"></button>
+              <div class="family-tile"><span data-family-name aria-live="polite" aria-atomic="true">Offense</span></div>
+              <button type="button" class="family-arrow" data-family-step="1" aria-label="Next family"></button>
             </nav>
             <dialog class="upgrade-description" id="upgrade-description" aria-labelledby="upgrade-description-title">
               <header class="upgrade-description-header">

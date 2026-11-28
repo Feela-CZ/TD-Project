@@ -57,6 +57,36 @@ async function holdUpgrade(page, node, dialog, mobile) {
   }
 }
 
+const familyNames = ['Offense', 'Mutation', 'Utility'];
+
+async function waitForFamily(page, label) {
+  await page.waitForFunction(name => document.querySelector('[data-family-name]').textContent === name &&
+    document.querySelector('.upgrade-tree').getAnimations().length === 0, label);
+}
+
+async function chooseFamily(page, label, press = locator => locator.click()) {
+  const current = await page.locator('[data-family-name]').textContent();
+  if (current === label) return;
+  const next = familyNames[(familyNames.indexOf(current) + 1) % familyNames.length];
+  await press(page.locator(`[data-family-step="${label === next ? 1 : -1}"]`));
+  await waitForFamily(page, label);
+}
+
+async function swipeSelection(page, x, y, dx) {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let step = 1; step <= 4; step++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove', touchPoints: [{ x: x + dx * step / 4, y }]
+      });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally {
+    await cdp.detach();
+  }
+}
+
 async function scenario(base, mobile, offline = false) {
   const page = await browser.newPage(mobile
     ? { viewport: { width: 390, height: 667 }, hasTouch: true, isMobile: true }
@@ -135,11 +165,11 @@ async function scenario(base, mobile, offline = false) {
     const colors = await panel.locator('.tree-tier').evaluateAll(tiers => tiers.map(tier => getComputedStyle(tier).color));
     assert.equal(new Set(colors).size, 3, 'each tier must have a distinct color');
     assert.equal(await panel.locator('.tree-node').count(), 9);
-    assert.deepEqual(await panel.locator('[data-group]').allTextContents(), ['Offense', 'Mutation', 'Utility']);
+    assert.deepEqual(await panel.locator('[data-family-name]').allTextContents(), ['Offense']);
     assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Ordnance', 'Cadence', 'Precision']);
-    await press(panel.locator('[data-group="1"]'));
+    await chooseFamily(page, 'Mutation', press);
     assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Carapace', 'Kinesis', 'Vital Mass']);
-    await press(panel.locator('[data-group="0"]'));
+    await chooseFamily(page, 'Offense', press);
     assert.equal(await panel.locator('#upgrade-detail').isVisible(), false);
     assert.equal(await panel.locator('.upgrade-help').count(), 0);
     await press(node('damage'));
@@ -162,7 +192,7 @@ async function scenario(base, mobile, offline = false) {
       await description.waitFor({ state:'hidden' });
       await page.waitForFunction(() => document.activeElement.dataset.node === 'damage');
     }
-    await press(panel.locator('[data-group="2"]'));
+    await chooseFamily(page, 'Utility', press);
     assert.deepEqual(await panel.locator('[data-families] button span').allTextContents(), ['Reserves', 'Control Nexus', 'Surge Core']);
     await press(node('overdrive'));
     assert.equal(await cost(), 'Free');
@@ -395,22 +425,64 @@ async function verifyTreeDetailsAndPortals(base) {
 
     await page.locator('[data-open]').tap();
     const tree = page.locator('.upgrade-tree');
-    const groups = page.locator('.upgrade-tabs button');
+    assert.equal(await page.locator('[data-family-name]').count(), 1);
     const alignment = await tree.evaluate(element => {
       const tiers = [...element.querySelectorAll('.tree-row')];
-      const tabs = element.parentElement.querySelector('.upgrade-tabs');
+      const center = box => box.x + box.width / 2;
+      const tile = element.parentElement.querySelector('.family-tile').getBoundingClientRect();
+      const root = tiers.at(-1).querySelectorAll('.tree-node')[1].getBoundingClientRect();
+      const links = element.querySelector('.family-links');
+      const connector = links.getBoundingClientRect();
       return {
         order: tiers.map(tier => tier.dataset.tier),
         heading: tiers.every(tier => tier.querySelector('h3').getBoundingClientRect().bottom <=
           tier.querySelector('.tree-nodes').getBoundingClientRect().top + .5),
-        bottom: tabs.getBoundingClientRect().top > element.getBoundingClientRect().bottom,
-        offset: [...tabs.children].map((tab, index) => tab.getBoundingClientRect().x -
-          tiers.at(-1).querySelectorAll('.tree-node')[index].getBoundingClientRect().x)
+        offset: Math.abs(center(tile) - center(root)),
+        connected: Math.abs(root.bottom - connector.top) < .5 && Math.abs(tile.top - connector.bottom) < .5 &&
+          links.children.length === 2 && getComputedStyle(links, '::before').width === '2px'
       };
     });
     assert.deepEqual(alignment.order, ['3', '2', '1']);
-    assert.ok(alignment.heading && alignment.bottom);
-    assert.deepEqual(alignment.offset, [0, 0, 0], 'family tabs align with the three columns');
+    assert.ok(alignment.heading && alignment.connected && alignment.offset < .5);
+    assert.equal(await page.locator('.family-tile').evaluate(tile => getComputedStyle(tile, '::after').animationName), 'family-pulse');
+
+    await page.locator('[data-family-step="-1"]').tap();
+    await waitForFamily(page, 'Utility');
+    await page.locator('[data-family-step="1"]').tap();
+    await waitForFamily(page, 'Offense');
+
+    const animated = await page.locator('[data-family-step="1"]').evaluate(button => {
+      button.click();
+      return document.querySelector('.upgrade-tree').getAnimations().length > 0;
+    });
+    assert.equal(animated, true, 'family change animates the tree');
+    await waitForFamily(page, 'Mutation');
+
+    const node = tree.locator('[data-families] button').first();
+    const nodeBox = await node.boundingBox();
+    await swipeSelection(page, nodeBox.x + nodeBox.width / 2, nodeBox.y + nodeBox.height / 2, 135);
+    await waitForFamily(page, 'Offense');
+    assert.equal(await page.locator('#upgrade-detail').isVisible(), false, 'a swipe across a tile does not select it');
+
+    const heading = await page.locator('.upgrade-heading').boundingBox();
+    await swipeSelection(page, heading.x + heading.width * .8, heading.y + heading.height / 2, -140);
+    await waitForFamily(page, 'Mutation');
+
+    const sheet = await page.locator('#upgrade-sheet').boundingBox();
+    await swipeSelection(page, 68, sheet.y / 2, 142);
+    await waitForFamily(page, 'Offense');
+
+    await page.locator('[data-family-step="1"]').evaluate(button => {
+      button.click();
+      button.click();
+      button.click();
+    });
+    await waitForFamily(page, 'Offense');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('[data-family-step="1"]').press('ArrowLeft');
+    await waitForFamily(page, 'Utility');
+    assert.equal(await page.locator('.family-tile').evaluate(tile => getComputedStyle(tile, '::after').animationName), 'none');
 
     const dialog = page.locator('#upgrade-description');
     async function verifyDescription(node, expectedRows) {
@@ -431,8 +503,8 @@ async function verifyTreeDetailsAndPortals(base) {
       await page.keyboard.press('Escape');
       await dialog.waitFor({ state: 'hidden' });
     }
-    for (let group = 0; group < 3; group++) {
-      await groups.nth(group).tap();
+    for (const family of familyNames) {
+      await chooseFamily(page, family, locator => locator.tap());
       for (let root = 0; root < 3; root++) {
         const node = tree.locator('[data-families] button').nth(root);
         await node.tap();
@@ -443,7 +515,7 @@ async function verifyTreeDetailsAndPortals(base) {
         }
       }
     }
-    console.log('PASS: bottom-aligned branches, all 63 descriptions without scrolling, and animated Breach on a phone.');
+    console.log('PASS: family carousel wraps, animates, and responds to touch and keyboard; all 63 descriptions fit on a phone.');
   } finally {
     await page.close();
   }
@@ -511,7 +583,7 @@ async function verifyAiming(base) {
       window.aimingTestMatch.players.human.energy = 100000;
     });
 
-    await page.locator('[data-group="2"]').click();
+    await chooseFamily(page, 'Utility');
     const root = page.locator('[data-node="overdrive"]');
     await root.click();
     await root.press('Enter');
@@ -724,8 +796,8 @@ async function verifyFixedViewports(base) {
       await checkFit('upgrades', ['#upgrade-panel', '.upgrade-tree']);
       await page.locator('[data-node="damage"]').click();
       await checkFit('selected upgrade', ['#upgrade-panel', '.upgrade-tree', '.upgrade-detail']);
-      for (const branch of [1, 2, 0]) {
-        await page.locator(`[data-group="${branch}"]`).click();
+      for (const family of ['Mutation', 'Utility', 'Offense']) {
+        await chooseFamily(page, family);
         await checkFit('upgrade branch', ['#upgrade-panel', '.upgrade-tree']);
       }
       await page.locator('[data-node="damage"]').press('Shift+Enter');

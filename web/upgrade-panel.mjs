@@ -5,6 +5,7 @@ import { UPGRADE_DETAILS, UPGRADE_EFFECTS } from './upgrade-copy.mjs';
 const makeBasic = ([id, label]) => ({ id, label, tier: 1, max: TIER1_MAX_LEVEL });
 const HOLD_DELAY = 550;
 const HOLD_TOLERANCE = 10;
+const SWIPE_THRESHOLD = 44;
 const TIER_LABELS = ['Tier I · Basic upgrade', 'Tier II · Specialization', 'Tier III · Ultimate'];
 
 export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
@@ -15,7 +16,9 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   const ultimates = panel.querySelector('[data-ultimates]');
   const ultimateLinks = panel.querySelector('[data-ultimate-links]');
   const specializationLinks = panel.querySelector('[data-specialization-links]');
-  const groupButtons = panel.querySelectorAll('[data-group]');
+  const familyTile = panel.querySelector('.family-tile');
+  const familyName = familyTile.querySelector('[data-family-name]');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const heading = panel.querySelector('[data-upgrade-heading]');
   const balance = panel.querySelector('[data-panel-flux]');
   const detail = panel.querySelector('.upgrade-detail');
@@ -39,6 +42,9 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   let selected = null;
   let hold = null;
   let suppressPointerClick = false;
+  let swipe = null;
+  let familyTransition = null;
+  const queuedSteps = [];
   let descriptionTrigger = null;
   let basics = [];
   let paths = [];
@@ -106,9 +112,11 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     if (drawnGroup !== groupIndex) {
       drawnGroup = groupIndex;
       nodes = new Map();
-      basics = UPGRADE_GROUPS[groupIndex].nodes.map(makeBasic);
+      const group = UPGRADE_GROUPS[groupIndex];
+      basics = group.nodes.map(makeBasic);
       buildNodes(families, basics);
-      groupButtons.forEach((button, index) => button.setAttribute('aria-pressed', String(index === groupIndex)));
+      panel.dataset.family = group.title.toLowerCase();
+      text(familyName, group.title);
     }
     if (drawnRoot === root) return;
     drawnRoot = root;
@@ -172,6 +180,64 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     text(feedback, '');
   }
 
+  function applyFamilyStep(step) {
+    const focused = document.activeElement;
+    const restoreFocus = tree.contains(focused) || detail.contains(focused);
+    const count = UPGRADE_GROUPS.length;
+    groupIndex = (groupIndex + step + count) % count;
+    clearSelection();
+    refresh(snapshot, running);
+    if (restoreFocus) {
+      panel.querySelector(`[data-family-step="${step}"]`).focus({ preventScroll: true });
+    }
+  }
+
+  function cancelFamilyTransition() {
+    const transition = familyTransition;
+    familyTransition = null;
+    queuedSteps.length = 0;
+    transition?.animations.forEach(animation => animation.cancel());
+  }
+
+  async function stepFamily(step) {
+    if (familyTransition) {
+      queuedSteps.push(step);
+      return;
+    }
+    cancelHold();
+    if (reduceMotion.matches) {
+      applyFamilyStep(step);
+      return;
+    }
+
+    const transition = { animations: [] };
+    familyTransition = transition;
+    const play = (frames, duration) => {
+      transition.animations = [tree, familyTile].map(element =>
+        element.animate(frames, { duration, easing: 'cubic-bezier(.2,.68,.25,1)', fill: 'both' }));
+      return Promise.all(transition.animations.map(animation => animation.finished));
+    };
+
+    try {
+      await play([{ opacity: 1, transform: 'translateX(0)' },
+        { opacity: 0, transform: `translateX(${-step * 30}px)` }], 105);
+      if (familyTransition !== transition) return;
+      applyFamilyStep(step);
+      transition.animations.forEach(animation => animation.cancel());
+      await play([{ opacity: 0, transform: `translateX(${step * 30}px)` },
+        { opacity: 1, transform: 'translateX(0)' }], 190);
+    } catch (error) {
+      if (error.name !== 'AbortError') throw error;
+    } finally {
+      if (familyTransition === transition) {
+        familyTransition = null;
+        transition.animations.forEach(animation => animation.cancel());
+        const next = queuedSteps.shift();
+        if (next) void stepFamily(next);
+      }
+    }
+  }
+
   function showDetail(offer) {
     selected = offer.id;
     detail.hidden = false;
@@ -214,7 +280,7 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   function openDescription(trigger, returnFocus = trigger) {
     const offer = nodes.get(trigger?.dataset.node)?.offer;
-    if (!offer || description.open) return;
+    if (!offer || description.open || familyTransition) return;
     cancelHold();
     const active = offer.id === 'overdrive' || offer.kind === 'active';
     const requirement = offer.tier === 2 ? `${nodes.get(currentRoot()).offer.label} at rank 1`
@@ -241,6 +307,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     if (!event.isPrimary || event.button !== 0) return;
     suppressPointerClick = false;
     cancelHold();
+    const onSelection = panel.contains(event.target) || (sheet.open && event.target === sheet);
+    swipe = onSelection && !description.open ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
     const trigger = event.target.closest('.tree-node');
     if (!trigger || !tree.contains(trigger) || description.open) return;
     const timer = setTimeout(() => {
@@ -262,6 +330,15 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   for (const type of ['pointerup', 'pointercancel']) {
     document.addEventListener(type, event => {
       if (hold?.id === event.pointerId) cancelHold();
+      if (swipe?.id !== event.pointerId) return;
+      const dx = event.clientX - swipe.x;
+      const dy = event.clientY - swipe.y;
+      swipe = null;
+      if (type === 'pointerup' && !description.open &&
+          Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > 1.35 * Math.abs(dy)) {
+        suppressPointerClick = true;
+        void stepFamily(dx < 0 ? 1 : -1);
+      }
     }, true);
   }
   document.addEventListener('click', event => {
@@ -297,14 +374,11 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     if (!button) return;
     if (button.hasAttribute('data-close-upgrade')) return close();
     if (button.hasAttribute('data-open-description')) return openDescription(nodes.get(selected)?.button, button);
-    if (button.dataset.group !== undefined) {
-      const index = Number(button.dataset.group);
-      if (index === groupIndex) return;
-      groupIndex = index;
-      clearSelection();
-      refresh(snapshot, running);
+    if (button.dataset.familyStep) {
+      void stepFamily(Number(button.dataset.familyStep));
       return;
     }
+    if (familyTransition) return;
     const offer = nodes.get(button.dataset.node)?.offer;
     if (!offer) return;
     if (selected === offer.id) return buy(offer);
@@ -314,6 +388,11 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
   });
 
   panel.addEventListener('keydown', event => {
+    if (!description.open && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+      event.preventDefault();
+      if (!event.repeat) void stepFamily(event.key === 'ArrowRight' ? 1 : -1);
+      return;
+    }
     if (event.key !== 'Enter' || !event.target.matches('.tree-node')) return;
     if (event.repeat || event.shiftKey) event.preventDefault();
     if (event.shiftKey && !event.repeat) openDescription(event.target);
@@ -326,6 +405,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
 
   function close() {
     cancelHold();
+    swipe = null;
+    cancelFamilyTransition();
     if (description.open) description.close();
     if (sheet.open) sheet.close();
   }
@@ -335,6 +416,8 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     const detailsOpen = description.open;
     const focused = panel.contains(document.activeElement) ? document.activeElement : null;
     cancelHold();
+    swipe = null;
+    cancelFamilyTransition();
     if (detailsOpen) description.close();
     if (wasOpen) sheet.close();
     (desktopLayout.matches ? desktop : sheet).append(panel);
@@ -353,7 +436,11 @@ export function createUpgradePanel({ panel, sheet, desktop, purchase }) {
     clearSelection();
   }
 
-  sheet.addEventListener('close', cancelHold);
+  sheet.addEventListener('close', () => {
+    cancelHold();
+    swipe = null;
+    if (!sheet.open) cancelFamilyTransition();
+  });
   desktopLayout.addEventListener('change', layout);
   layout();
   return { open, close, refresh, reset };
